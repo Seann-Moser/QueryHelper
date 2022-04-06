@@ -1,0 +1,26 @@
+name: Create Github Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    name: 'Release to GitHub'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Step Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 14
+      - name: Add convential commits plugin
+        run: npm install conventional-changelog-conventionalcommits
+        working-directory: ./.github/workflows
+      - name: 'Release'
+        working-directory: ./.github/workflows
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN  }}
+        run: npx semantic-release
