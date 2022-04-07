@@ -36,6 +36,9 @@ func GenerateTableFromStruct(database string, s interface{}) (*Table, error) {
 		if found := structType.Field(i).Tag.Get("where"); found != "" {
 			e.Where = found
 		}
+		if found := structType.Field(i).Tag.Get("join_name"); found != "" {
+			e.JoinName = found
+		}
 		if found := structType.Field(i).Tag.Get("data_type"); found != "" {
 			e.Type = found
 		} else {
@@ -64,6 +67,14 @@ func GenerateTableFromStruct(database string, s interface{}) (*Table, error) {
 			}
 		} else {
 			e.Selectable = true
+		}
+		if found := structType.Field(i).Tag.Get("joinable"); found != "" {
+			e.Joinable, err = strconv.ParseBool(found)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			e.Joinable = true
 		}
 		if found := structType.Field(i).Tag.Get("table"); found == "primary" {
 			e.PrimaryKey = true
