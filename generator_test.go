@@ -6,12 +6,30 @@ import (
 )
 
 type Test struct {
+	UserID      string `db:"user_id" join_name:"id"`
 	Name        string `db:"name" default:"jon smith" table:"primary"`
 	UserName    string `db:"user_name" update:"true" can_be_null:"false" can_update:"true"`
 	CreatedDate string `db:"created_date" default:"NOW()" data_type:"timestamp" table:"skip_insert"`
 	Password    string `db:"password" selectable:"false" where:"="`
 	UpdatedDate string `db:"updated_date" default:"" data_type:"timestamp" table:"skip_insert" can_be_null:"true" can_update:"true"`
 	Active      bool   `db:"active" default:"true" can_update:"true" where:"="`
+}
+
+type Test2 struct {
+	TestID string `db:"test_id" join_name:"id"`
+	Active bool   `db:"active" default:"true" can_update:"true" joinable:"false"`
+}
+
+func TestTable_GenerateNamedSelectJoinStatement(t *testing.T) {
+	newTable, err := GenerateTableFromStruct("default_db", Test{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	newTable2, err := GenerateTableFromStruct("default_db", Test2{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "SELECT Test.user_id, Test.name, Test.user_name, Test.created_date, Test.updated_date, Test.active, Test2.test_id, Test2.active FROM default_db.Test  JOIN default_db.Test2 ON Test2.test_id = Test.user_id  WHERE Test.name = :name", newTable.GenerateNamedSelectJoinStatement(newTable2))
 }
 
 func TestTable_GenerateNamedSelectStatement(t *testing.T) {
