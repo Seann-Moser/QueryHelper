@@ -16,8 +16,8 @@ type Elements struct {
 	Default    string
 	PrimaryKey bool
 	SkipInsert bool
-	SkipUpdate bool
-	NotNull    bool
+	CanUpdate  bool
+	CanBeNull  bool
 }
 
 func (t *Table) GenerateNamedInsertStatement() string {
@@ -48,7 +48,7 @@ func (t *Table) GenerateNamedUpdateStatement() string {
 			whereValues = append(whereValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
 			continue
 		}
-		if e.SkipUpdate {
+		if !e.CanUpdate {
 			continue
 		}
 		setValues = append(setValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))

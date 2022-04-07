@@ -46,13 +46,13 @@ func GenerateTableFromStruct(database string, s interface{}) (*Table, error) {
 			}
 
 		}
-		if found := structType.Field(i).Tag.Get("null"); found != "" {
-			e.NotNull, err = strconv.ParseBool(found)
+		if found := structType.Field(i).Tag.Get("can_be_null"); found != "" {
+			e.CanBeNull, err = strconv.ParseBool(found)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			e.NotNull = true
+			e.CanBeNull = false
 		}
 		if found := structType.Field(i).Tag.Get("table"); found == "primary" {
 			e.PrimaryKey = true
@@ -64,17 +64,16 @@ func GenerateTableFromStruct(database string, s interface{}) (*Table, error) {
 		} else {
 			e.SkipInsert = false
 		}
-		if found := structType.Field(i).Tag.Get("update"); found != "" {
-			e.SkipUpdate, err = strconv.ParseBool(found)
+		if found := structType.Field(i).Tag.Get("can_update"); found != "" {
+			e.CanUpdate, err = strconv.ParseBool(found)
 			if err != nil {
 				return nil, err
 			}
-			e.SkipUpdate = !e.SkipUpdate
 			if e.PrimaryKey {
-				e.SkipUpdate = true
+				e.CanUpdate = false
 			}
 		} else {
-			e.SkipUpdate = true
+			e.CanUpdate = false
 		}
 
 		newTable.Elements = append(newTable.Elements, &e)
@@ -86,18 +85,18 @@ func CreateMySqlTable(ctx context.Context, db *sqlx.DB, t *Table) error {
 	createSchema := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;", t.Dataset)
 	_, err := db.ExecContext(ctx, createSchema)
 	if err != nil {
-		return err
+		return fmt.Errorf("err: %v, schema: %s", err, createSchema)
 	}
 	PrimaryKeys := []string{}
 	createString := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s(", t.Dataset, t.Name)
 	for _, element := range t.Elements {
 		elementString := fmt.Sprintf("\n\t%s %s", element.Name, element.Type)
-		if element.NotNull {
+		if !element.CanBeNull {
 			elementString += " NOT NULL"
 		}
 		if element.Default != "" {
 			elementString += fmt.Sprintf(" DEFAULT %s", element.Default)
-		} else if element.Default == "" && !element.NotNull {
+		} else if element.Default == "" && element.CanBeNull {
 			elementString += " DEFAULT NULL"
 		}
 		createString += elementString + ","
@@ -118,7 +117,7 @@ func CreateMySqlTable(ctx context.Context, db *sqlx.DB, t *Table) error {
 	if db != nil {
 		_, err := db.ExecContext(ctx, createString)
 		if err != nil {
-			return err
+			return fmt.Errorf("err: %v, table: %s", err, createString)
 		}
 	}
 	return nil

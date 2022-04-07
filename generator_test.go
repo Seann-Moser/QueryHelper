@@ -7,8 +7,9 @@ import (
 
 type Test struct {
 	Name        string `db:"name" default:"jon smith" table:"primary"`
-	UserName    string `db:"user_name" update:"true" null:"true"`
+	UserName    string `db:"user_name" update:"true" can_be_null:"false" can_update:"true"`
 	CreatedDate string `db:"created_date" default:"NOW()" data_type:"timestamp" table:"skip_insert"`
+	UpdatedDate string `db:"updated_date" default:"" data_type:"timestamp" table:"skip_insert" can_be_null:"true" can_update:"true"`
 }
 
 func TestTable_GenerateNamedUpdateStatement(t *testing.T) {
@@ -16,7 +17,7 @@ func TestTable_GenerateNamedUpdateStatement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, "UPDATE default_db.Test SET user_name = :user_name WHERE name = :name", newTable.GenerateNamedUpdateStatement())
+	assert.Equal(t, "UPDATE default_db.Test SET user_name = :user_name ,updated_date = :updated_date WHERE name = :name", newTable.GenerateNamedUpdateStatement())
 }
 func TestTable_GenerateNamedInsertStatement(t *testing.T) {
 	newTable, err := GenerateTableFromStruct("default_db", Test{})
@@ -42,8 +43,8 @@ func TestGenerateTableFromStruct(t *testing.T) {
 				Default:    "\"jon smith\"",
 				PrimaryKey: true,
 				SkipInsert: false,
-				SkipUpdate: true,
-				NotNull:    true,
+				CanUpdate:  false,
+				CanBeNull:  false,
 			},
 			{
 				Name:       "user_name",
@@ -51,8 +52,8 @@ func TestGenerateTableFromStruct(t *testing.T) {
 				Default:    "",
 				PrimaryKey: false,
 				SkipInsert: false,
-				SkipUpdate: false,
-				NotNull:    true,
+				CanUpdate:  true,
+				CanBeNull:  false,
 			},
 			{
 				Name:       "created_date",
@@ -60,8 +61,17 @@ func TestGenerateTableFromStruct(t *testing.T) {
 				Default:    "NOW()",
 				PrimaryKey: false,
 				SkipInsert: true,
-				SkipUpdate: true,
-				NotNull:    true,
+				CanUpdate:  false,
+				CanBeNull:  false,
+			},
+			{
+				Name:       "updated_date",
+				Type:       TableTime,
+				Default:    "",
+				PrimaryKey: false,
+				SkipInsert: true,
+				CanUpdate:  true,
+				CanBeNull:  true,
 			},
 		},
 	}, newTable)
