@@ -18,6 +18,8 @@ type Elements struct {
 	SkipInsert bool
 	CanUpdate  bool
 	CanBeNull  bool
+	Selectable bool
+	Where      string
 }
 
 func (t *Table) GenerateNamedInsertStatement() string {
@@ -62,4 +64,24 @@ func (t *Table) GenerateNamedUpdateStatement() string {
 		t.Name,
 		strings.Join(setValues, " ,"), strings.Join(whereValues, " AND "))
 	return update
+}
+
+func (t *Table) GenerateNamedSelectStatement() string {
+	var selectValues []string
+	var whereValues []string
+	for _, e := range t.Elements {
+		if len(e.Where) > 0 {
+			whereValues = append(whereValues, fmt.Sprintf("%s %s :%s", e.Name, e.Where, e.Name))
+		}
+		if e.Selectable {
+			selectValues = append(selectValues, e.Name)
+		}
+	}
+	whereStmt := ""
+	if len(whereValues) > 0 {
+		whereStmt = fmt.Sprintf(" WHERE %s", strings.Join(whereValues, " AND "))
+	}
+	selectStmt := fmt.Sprintf("SELECT %s FROM %s.%s", strings.Join(selectValues, ", "), t.Dataset, t.Name)
+	selectStmt += whereStmt
+	return selectStmt
 }

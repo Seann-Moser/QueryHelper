@@ -9,9 +9,18 @@ type Test struct {
 	Name        string `db:"name" default:"jon smith" table:"primary"`
 	UserName    string `db:"user_name" update:"true" can_be_null:"false" can_update:"true"`
 	CreatedDate string `db:"created_date" default:"NOW()" data_type:"timestamp" table:"skip_insert"`
+	Password    string `db:"password" selectable:"false" where:"="`
 	UpdatedDate string `db:"updated_date" default:"" data_type:"timestamp" table:"skip_insert" can_be_null:"true" can_update:"true"`
+	Active      bool   `db:"active" default:"true" can_update:"true" where:"="`
 }
 
+func TestTable_GenerateNamedSelectStatement(t *testing.T) {
+	newTable, err := GenerateTableFromStruct("default_db", Test{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "SELECT name, user_name, created_date, updated_date, active FROM default_db.Test WHERE password = :password AND active = :active", newTable.GenerateNamedSelectStatement())
+}
 func TestTable_GenerateNamedUpdateStatement(t *testing.T) {
 	newTable, err := GenerateTableFromStruct("default_db", Test{})
 	if err != nil {
