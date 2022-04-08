@@ -29,7 +29,7 @@ func TestTable_GenerateNamedSelectJoinStatement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, "SELECT Test.user_id, Test.name, Test.user_name, Test.created_date, Test.updated_date, Test.active, Test2.test_id, Test2.active FROM default_db.Test  JOIN default_db.Test2 ON Test2.test_id = Test.user_id  WHERE Test.name = :name", newTable.GenerateNamedSelectJoinStatement(newTable2))
+	assert.Equal(t, "SELECT Test.user_id, Test.name, Test.user_name, Test.created_date, Test.updated_date, Test.active FROM default_db.Test  JOIN default_db.Test2 ON Test2.test_id = Test.user_id  WHERE Test.password = :password AND Test.active = :active AND Test.password = :password AND Test.active = :active", newTable.GenerateNamedSelectJoinStatement(newTable2))
 }
 
 func TestTable_GenerateNamedSelectStatement(t *testing.T) {
@@ -37,14 +37,14 @@ func TestTable_GenerateNamedSelectStatement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, "SELECT name, user_name, created_date, updated_date, active FROM default_db.Test WHERE password = :password AND active = :active", newTable.GenerateNamedSelectStatement())
+	assert.Equal(t, "SELECT user_id, name, user_name, created_date, updated_date, active FROM default_db.Test WHERE password = :password AND active = :active", newTable.GenerateNamedSelectStatement())
 }
 func TestTable_GenerateNamedUpdateStatement(t *testing.T) {
 	newTable, err := GenerateTableFromStruct("default_db", Test{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, "UPDATE default_db.Test SET user_name = :user_name ,updated_date = :updated_date WHERE name = :name", newTable.GenerateNamedUpdateStatement())
+	assert.Equal(t, "UPDATE default_db.Test SET user_name = :user_name ,updated_date = :updated_date ,active = :active WHERE name = :name", newTable.GenerateNamedUpdateStatement())
 }
 func TestTable_GenerateNamedInsertStatement(t *testing.T) {
 	newTable, err := GenerateTableFromStruct("default_db", Test{})
@@ -52,7 +52,7 @@ func TestTable_GenerateNamedInsertStatement(t *testing.T) {
 		t.Fatal(err)
 	}
 	//err = CreateMySqlTable(ctx,db,newTable)
-	assert.Equal(t, "INSERT INTO default_db.Test(name,user_name) VALUES(:name,:user_name);", newTable.GenerateNamedInsertStatement())
+	assert.Equal(t, "INSERT INTO default_db.Test(user_id,name,user_name,password,active) VALUES(:user_id,:name,:user_name,:password,:active);", newTable.GenerateNamedInsertStatement())
 
 }
 func TestGenerateTableFromStruct(t *testing.T) {
@@ -65,6 +65,18 @@ func TestGenerateTableFromStruct(t *testing.T) {
 		Name:    "Test",
 		Elements: []*Elements{
 			{
+				Name:       "user_id",
+				Type:       TableTypeVarChar,
+				Default:    "",
+				PrimaryKey: false,
+				SkipInsert: false,
+				CanUpdate:  false,
+				CanBeNull:  false,
+				Selectable: true,
+				JoinName:   "id",
+				Joinable:   true,
+			},
+			{
 				Name:       "name",
 				Type:       TableTypeVarChar,
 				Default:    "\"jon smith\"",
@@ -72,6 +84,8 @@ func TestGenerateTableFromStruct(t *testing.T) {
 				SkipInsert: false,
 				CanUpdate:  false,
 				CanBeNull:  false,
+				Selectable: true,
+				Joinable:   true,
 			},
 			{
 				Name:       "user_name",
@@ -81,7 +95,10 @@ func TestGenerateTableFromStruct(t *testing.T) {
 				SkipInsert: false,
 				CanUpdate:  true,
 				CanBeNull:  false,
+				Selectable: true,
+				Joinable:   true,
 			},
+
 			{
 				Name:       "created_date",
 				Type:       TableTime,
@@ -89,7 +106,21 @@ func TestGenerateTableFromStruct(t *testing.T) {
 				PrimaryKey: false,
 				SkipInsert: true,
 				CanUpdate:  false,
+				Selectable: true,
 				CanBeNull:  false,
+				Joinable:   true,
+			},
+			{
+				Name:       "password",
+				Type:       TableTypeVarChar,
+				Default:    "",
+				PrimaryKey: false,
+				SkipInsert: false,
+				CanUpdate:  false,
+				CanBeNull:  false,
+				Selectable: false,
+				Where:      "=",
+				Joinable:   true,
 			},
 			{
 				Name:       "updated_date",
@@ -99,6 +130,20 @@ func TestGenerateTableFromStruct(t *testing.T) {
 				SkipInsert: true,
 				CanUpdate:  true,
 				CanBeNull:  true,
+				Selectable: true,
+				Joinable:   true,
+			},
+			{
+				Name:       "active",
+				Type:       TableTypeBool,
+				Default:    "true",
+				PrimaryKey: false,
+				SkipInsert: false,
+				CanUpdate:  true,
+				CanBeNull:  false,
+				Where:      "=",
+				Selectable: true,
+				Joinable:   true,
 			},
 		},
 	}, newTable)
