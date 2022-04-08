@@ -172,6 +172,7 @@ func joinMaps(m ...map[string]interface{}) map[string]interface{} {
 func (t *Table) FindCommonElementName(e2List *Table) ([]string, []string) {
 	joinArr := []string{}
 	var whereValues []string
+	addedWhereValues := map[string]bool{}
 	for _, e := range t.Elements {
 		columnName := e.Name
 		if e.JoinName != "" {
@@ -181,17 +182,15 @@ func (t *Table) FindCommonElementName(e2List *Table) ([]string, []string) {
 			continue
 		}
 		for _, e2 := range e2List.Elements {
-			if !e2.Joinable {
-				continue
-			}
-			if e2.Name == columnName || e2.JoinName == columnName {
+			if (e2.Name == columnName || e2.JoinName == columnName) && e2.Joinable {
 				joinArr = append(joinArr, fmt.Sprintf("%s = %s",
 					e2List.FullElementName(e2),
 					t.FullElementName(e),
 				))
 			} else {
-				if len(e.Where) > 0 {
-					whereValues = append(whereValues, fmt.Sprintf("%s %s :%s", t.FullElementName(e), e.Where, e.Name))
+				if _, found := addedWhereValues[e2.Name]; !found && len(e2.Where) > 0 && !e2.Joinable {
+					addedWhereValues[e2.Name] = true
+					whereValues = append(whereValues, fmt.Sprintf("%s %s :%s", e2List.FullElementName(e2), e2.Where, e2.Name))
 				}
 			}
 		}

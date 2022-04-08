@@ -17,7 +17,8 @@ type Test struct {
 
 type Test2 struct {
 	TestID string `db:"test_id" join_name:"id"`
-	Active bool   `db:"active" default:"true" can_update:"true" joinable:"false"`
+	Name   string `db:"name"  table:"primary" where:"=" joinable:"false"`
+	Active bool   `db:"active" default:"true" can_update:"true" joinable:"false" where:"="`
 }
 
 func TestTable_GenerateNamedSelectJoinStatement(t *testing.T) {
@@ -29,7 +30,7 @@ func TestTable_GenerateNamedSelectJoinStatement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, "SELECT Test.user_id, Test.name, Test.user_name, Test.created_date, Test.updated_date, Test.active FROM default_db.Test  JOIN default_db.Test2 ON Test2.test_id = Test.user_id  WHERE Test.password = :password AND Test.active = :active AND Test.password = :password AND Test.active = :active", newTable.GenerateNamedSelectJoinStatement(newTable2))
+	assert.Equal(t, "SELECT Test.user_id, Test.name, Test.user_name, Test.created_date, Test.updated_date, Test.active FROM default_db.Test  JOIN default_db.Test2 ON Test2.test_id = Test.user_id  WHERE Test2.name = :name AND Test2.active = :active AND Test.password = :password AND Test.active = :active", newTable.GenerateNamedSelectJoinStatement(newTable2))
 }
 
 func TestTable_GenerateNamedSelectStatement(t *testing.T) {
