@@ -3,10 +3,11 @@ package QueryHelper
 import (
 	"context"
 	"fmt"
-	"github.com/jmoiron/sqlx"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/jmoiron/sqlx"
 )
 
 const (
@@ -51,6 +52,14 @@ func GenerateTableFromStruct(database string, s interface{}) (*Table, error) {
 				e.Default = found
 			}
 
+		}
+		if found := structType.Field(i).Tag.Get("delete"); found != "" {
+			e.Delete, err = strconv.ParseBool(found)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			e.Delete = false
 		}
 		if found := structType.Field(i).Tag.Get("can_be_null"); found != "" {
 			e.CanBeNull, err = strconv.ParseBool(found)

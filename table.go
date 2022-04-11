@@ -23,6 +23,7 @@ type Elements struct {
 	Where      string
 	JoinName   string
 	Joinable   bool
+	Delete     bool
 }
 
 func (t *Table) GenerateNamedInsertStatement() string {
@@ -47,7 +48,6 @@ func (t *Table) GenerateNamedInsertStatement() string {
 func (t *Table) GenerateNamedUpdateStatement() string {
 	var setValues []string
 	var whereValues []string
-
 	for _, e := range t.Elements {
 		if e.PrimaryKey {
 			whereValues = append(whereValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
@@ -57,7 +57,6 @@ func (t *Table) GenerateNamedUpdateStatement() string {
 			continue
 		}
 		setValues = append(setValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
-
 	}
 	if len(setValues) == 0 {
 		return ""
@@ -68,7 +67,19 @@ func (t *Table) GenerateNamedUpdateStatement() string {
 		strings.Join(setValues, " ,"), strings.Join(whereValues, " AND "))
 	return update
 }
-
+func (t *Table) GenerateNamedDeleteStatement() string {
+	var whereValues []string
+	for _, e := range t.Elements {
+		if e.PrimaryKey {
+			whereValues = append(whereValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
+			continue
+		}
+		if e.Delete {
+			return fmt.Sprintf("DELETE FROM %s WHERE %s = :%s", t.FullTableName(), e.Name, e.Name)
+		}
+	}
+	return fmt.Sprintf("DELETE FROM %s WHERE %s", t.FullTableName(), strings.Join(whereValues, " AND "))
+}
 func (t *Table) GenerateNamedSelectStatement() string {
 	var selectValues []string
 	var whereValues []string

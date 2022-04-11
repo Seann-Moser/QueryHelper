@@ -1,12 +1,13 @@
 package QueryHelper
 
 import (
-	"github.com/tj/assert"
 	"testing"
+
+	"github.com/tj/assert"
 )
 
 type Test struct {
-	UserID      string `db:"user_id" join_name:"id"`
+	UserID      string `db:"user_id" join_name:"id" delete:"true"`
 	Name        string `db:"name" default:"jon smith" table:"primary"`
 	UserName    string `db:"user_name" update:"true" can_be_null:"false" can_update:"true"`
 	CreatedDate string `db:"created_date" default:"NOW()" data_type:"timestamp" table:"skip_insert"`
@@ -56,6 +57,15 @@ func TestTable_GenerateNamedInsertStatement(t *testing.T) {
 	assert.Equal(t, "INSERT INTO default_db.Test(user_id,name,user_name,password,active) VALUES(:user_id,:name,:user_name,:password,:active);", newTable.GenerateNamedInsertStatement())
 
 }
+func TestTable_GenerateNamedDeleteStatement(t *testing.T) {
+	newTable, err := GenerateTableFromStruct("default_db", Test{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	//err = CreateMySqlTable(ctx,db,newTable)
+	assert.Equal(t, "DELETE FROM default_db.Test WHERE user_id = :user_id", newTable.GenerateNamedDeleteStatement())
+
+}
 func TestGenerateTableFromStruct(t *testing.T) {
 	newTable, err := GenerateTableFromStruct("default_db", Test{})
 	if err != nil {
@@ -76,6 +86,7 @@ func TestGenerateTableFromStruct(t *testing.T) {
 				Selectable: true,
 				JoinName:   "id",
 				Joinable:   true,
+				Delete:     true,
 			},
 			{
 				Name:       "name",
