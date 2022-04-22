@@ -13,7 +13,6 @@ type Test struct {
 	Password    string `db:"password" selectable:"false" where:"="`
 	UpdatedDate string `db:"updated_date" default:"" data_type:"timestamp" table:"skip_insert" can_be_null:"true" can_update:"true"`
 	Active      bool   `db:"active" default:"true" can_update:"true" where:"="`
-	TestStruct  Test2
 }
 
 type Test2 struct {

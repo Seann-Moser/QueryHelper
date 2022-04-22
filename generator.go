@@ -28,10 +28,8 @@ func GenerateTableFromStruct(database string, s interface{}) (*Table, error) {
 
 	structType := reflect.TypeOf(s)
 	for i := 0; i < structType.NumField(); i++ {
-		fmt.Printf("%v\n", structType.Field(i))
 		e := Elements{}
 		e.Name = structType.Field(i).Tag.Get("db")
-		println(structType.Field(i).Type.Kind().String())
 
 		if e.Name == "" {
 			e.Name = structType.Field(i).Name
