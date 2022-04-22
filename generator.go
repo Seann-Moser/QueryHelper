@@ -31,11 +31,15 @@ func GenerateTableFromStruct(database string, s interface{}) (*Table, error) {
 	for i := 0; i < structType.NumField(); i++ {
 		e := Elements{}
 		e.Name = structType.Field(i).Tag.Get("db")
+
 		if e.Name == "" {
 			e.Name = structType.Field(i).Name
 		}
 		if found := structType.Field(i).Tag.Get("where"); found != "" {
 			e.Where = found
+		}
+		if found := structType.Field(i).Tag.Get("skip_table"); found != "" {
+			continue
 		}
 		if found := structType.Field(i).Tag.Get("join_name"); found != "" {
 			e.JoinName = found
@@ -51,7 +55,6 @@ func GenerateTableFromStruct(database string, s interface{}) (*Table, error) {
 			} else {
 				e.Default = found
 			}
-
 		}
 		if found := structType.Field(i).Tag.Get("delete"); found != "" {
 			e.Delete, err = strconv.ParseBool(found)
@@ -112,6 +115,7 @@ func GenerateTableFromStruct(database string, s interface{}) (*Table, error) {
 
 	return &newTable, nil
 }
+
 func CreateMySqlTable(ctx context.Context, db *sqlx.DB, t *Table) error {
 	createSchema := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;", t.Dataset)
 	_, err := db.ExecContext(ctx, createSchema)
