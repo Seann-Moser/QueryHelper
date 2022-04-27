@@ -13,7 +13,7 @@ import (
 const (
 	TableTypeInt     = "int"
 	TableTypeFloat   = "int"
-	TableTypeVarChar = "varchar(512)"
+	TableTypeVarChar = "varchar(256)"
 	TableTypeText    = "text"
 	TableTypeBool    = "tinyint(1)"
 	TableTime        = "timestamp"
