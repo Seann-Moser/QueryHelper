@@ -2,12 +2,15 @@ package QueryHelper
 
 import (
 	"context"
+	"crypto/sha1"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-
 	"github.com/jmoiron/sqlx"
+	"github.com/patrickmn/go-cache"
 	"go.uber.org/multierr"
+	"time"
 )
 
 type Dataset struct {
@@ -16,6 +19,7 @@ type Dataset struct {
 	tables          map[string]*Table
 	ctx             context.Context
 	DB              *sqlx.DB
+	cache           *cache.Cache
 }
 
 func NewDataset(ctx context.Context, name string, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
@@ -25,6 +29,7 @@ func NewDataset(ctx context.Context, name string, db *sqlx.DB, structsToTables .
 		tables:          map[string]*Table{},
 		ctx:             ctx,
 		DB:              db,
+		cache:           cache.New(2*time.Minute, 5*time.Minute),
 	}
 	for _, i := range d.structsToTables {
 		err := d.addTable(i)
@@ -54,15 +59,40 @@ func (d *Dataset) GetTable(s interface{}) *Table {
 
 func (d *Dataset) Select(s interface{}) (*sqlx.Rows, error) {
 	if v, found := d.tables[getType(s)]; found {
-		b, _ := json.Marshal(s)
-		t := map[string]interface{}{}
-		err := json.Unmarshal(b, &t)
+		selectStatement := v.GenerateNamedSelectStatement()
+		b, err := json.Marshal(s)
 		if err != nil {
 			return nil, err
 		}
-		return d.DB.NamedQueryContext(d.ctx, v.GenerateNamedSelectStatement(), t)
+		key := getCacheKey(b, selectStatement)
+		if v, found := d.cache.Get(key); found {
+			switch t := v.(type) {
+			case sqlx.Rows:
+				return &t, nil
+			case *sqlx.Rows:
+				return t, nil
+			}
+		}
+
+		t := map[string]interface{}{}
+		err = json.Unmarshal(b, &t)
+		if err != nil {
+			return nil, err
+		}
+		rows, err := d.DB.NamedQueryContext(d.ctx, selectStatement, t)
+		if err != nil {
+			return nil, err
+		}
+		d.cache.Set(key, rows, cache.DefaultExpiration)
+		return rows, nil
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
+}
+func getCacheKey(data []byte, selectStmt string) string {
+	h := sha1.New()
+	h.Write(append(data, []byte(selectStmt)...))
+	sha1Hash := hex.EncodeToString(h.Sum(nil))
+	return sha1Hash
 }
 
 func (d *Dataset) Insert(s interface{}) (sql.Result, error) {

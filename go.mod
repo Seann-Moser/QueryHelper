@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/jmoiron/sqlx v1.3.4
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/tj/assert v0.0.3
 	go.uber.org/multierr v1.8.0
 )
