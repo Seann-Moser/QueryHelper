@@ -20,6 +20,7 @@ type Dataset struct {
 	ctx             context.Context
 	DB              *sqlx.DB
 	cache           *cache.Cache
+	Debug           bool
 }
 
 func NewDataset(ctx context.Context, name string, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
@@ -57,9 +58,12 @@ func (d *Dataset) GetTable(s interface{}) *Table {
 	return nil
 }
 
-func (d *Dataset) Select(s interface{}) (*sqlx.Rows, error) {
+func (d *Dataset) Select(s interface{}, whereStmts ...string) (*sqlx.Rows, error) {
 	if v, found := d.tables[getType(s)]; found {
 		selectStatement := v.GenerateNamedSelectStatement()
+		if len(whereStmts) > 0 {
+			selectStatement = v.GenerateNamedSelectStatementWithCustomWhere(whereStmts...)
+		}
 		b, err := json.Marshal(s)
 		if err != nil {
 			return nil, err
@@ -78,6 +82,9 @@ func (d *Dataset) Select(s interface{}) (*sqlx.Rows, error) {
 		err = json.Unmarshal(b, &t)
 		if err != nil {
 			return nil, err
+		}
+		if d.Debug {
+			fmt.Printf("select statement: %s\n", selectStatement)
 		}
 		rows, err := d.DB.NamedQueryContext(d.ctx, selectStatement, t)
 		if err != nil {
@@ -119,7 +126,10 @@ func (d *Dataset) Delete(s interface{}) (sql.Result, error) {
 func (d *Dataset) DeleteAllReferences(s interface{}) (sql.Result, error) {
 	var err error
 	for _, v := range d.tables {
-		_, e := d.DB.NamedExecContext(d.ctx, v.GenerateNamedUpdateStatement(), s)
+		if d.Debug {
+			fmt.Printf("delete: %s\n", v.GenerateNamedDeleteStatement())
+		}
+		_, e := d.DB.NamedExecContext(d.ctx, v.GenerateNamedDeleteStatement(), s)
 		err = multierr.Combine(err, e)
 	}
 	return nil, err
@@ -136,7 +146,32 @@ func (d *Dataset) SelectJoin(s ...interface{}) (*sqlx.Rows, error) {
 		if err != nil {
 			return nil, err
 		}
-		return d.DB.NamedQueryContext(d.ctx, v.GenerateNamedSelectJoinStatement(tables[1:]...), interface{}(args))
+		query := v.GenerateNamedSelectJoinStatement(tables[1:]...)
+		if d.Debug {
+			fmt.Printf("joinedSelect: %s\n", query)
+		}
+		return d.DB.NamedQueryContext(d.ctx, query, interface{}(args))
+	}
+	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
+}
+
+func (d *Dataset) SelectJoinCustomWhere(whereStr []string, s ...interface{}) (*sqlx.Rows, error) {
+	if v, found := d.tables[getType(s[0])]; found {
+		var tables []*Table
+		for _, t := range s {
+			if v, found := d.tables[getType(t)]; found {
+				tables = append(tables, v)
+			}
+		}
+		args, err := CombineStructs(s[0:]...)
+		if err != nil {
+			return nil, err
+		}
+		query := v.GenerateNamedSelectJoinStatementWithCustomWhere(whereStr, tables[1:]...)
+		if d.Debug {
+			fmt.Printf("joinedSelect: %s\n", query)
+		}
+		return d.DB.NamedQueryContext(d.ctx, query, interface{}(args))
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
@@ -155,7 +190,11 @@ func (d *Dataset) SelectJoinDatasets(d2 *Dataset, s ...interface{}) (*sqlx.Rows,
 		if err != nil {
 			return nil, err
 		}
-		return d.DB.NamedQueryContext(d.ctx, v.GenerateNamedSelectJoinStatement(tables[1:]...), interface{}(args))
+		query := v.GenerateNamedSelectJoinStatement(tables[1:]...)
+		if d.Debug {
+			fmt.Printf("joinedSelect: %s\n", query)
+		}
+		return d.DB.NamedQueryContext(d.ctx, query, interface{}(args))
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
