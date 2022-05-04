@@ -99,6 +99,81 @@ func (t *Table) GenerateNamedSelectStatement() string {
 	selectStmt += whereStmt
 	return selectStmt
 }
+func (t *Table) GenerateNamedSelectStatementWithCustomWhere(whereElementsStr ...string) string {
+	var selectValues []string
+	var whereValues []string
+	for _, i := range whereElementsStr {
+		element := t.FindElementWithName(i)
+		if element != nil {
+			tmp := element.Where
+			if element.Where == "" {
+				tmp = "="
+			}
+			whereValues = append(whereValues, fmt.Sprintf("%s %s :%s", element.Name, tmp, element.Name))
+		}
+	}
+	for _, e := range t.Elements {
+		if e.Selectable {
+			selectValues = append(selectValues, e.Name)
+		}
+	}
+	whereStmt := ""
+	if len(whereValues) > 0 {
+		whereStmt = fmt.Sprintf(" WHERE %s", strings.Join(whereValues, " AND "))
+	}
+	selectStmt := fmt.Sprintf("SELECT %s FROM %s.%s", strings.Join(selectValues, ", "), t.Dataset, t.Name)
+	selectStmt += whereStmt
+	return selectStmt
+}
+
+func (t *Table) GenerateNamedSelectJoinStatementWithCustomWhere(whereElementsStr []string, joinTables ...*Table) string {
+	validTables := []*Table{t}
+	joinStmts := []string{}
+	var whereValues []string
+	for _, currentTable := range joinTables {
+		commonElements, _ := t.FindCommonElementName(currentTable)
+		if len(commonElements) == 0 {
+			continue
+		}
+		for _, i := range whereElementsStr {
+			element := currentTable.FindElementWithName(i)
+			if element != nil {
+				tmp := element.Where
+				if element.Where == "" {
+					tmp = "="
+				}
+				whereValues = append(whereValues, fmt.Sprintf("%s %s :%s", currentTable.FullElementName(element), tmp, element.Name))
+			}
+		}
+		//whereValues = append(whereValues, wv...)
+		validTables = append(validTables, currentTable)
+		joinStmt := fmt.Sprintf(" JOIN %s ON %s", currentTable.FullTableName(), strings.Join(commonElements, " AND "))
+		joinStmts = append(joinStmts, joinStmt)
+	}
+
+	var selectValues []string
+	for _, validTable := range validTables {
+		selectValues = append(selectValues, validTable.GetSelectableElements(true)...)
+	}
+
+	for _, i := range whereElementsStr {
+		element := t.FindElementWithName(i)
+		if element != nil {
+			tmp := element.Where
+			if element.Where == "" {
+				tmp = "="
+			}
+			whereValues = append(whereValues, fmt.Sprintf("%s %s :%s", element.Name, tmp, element.Name))
+		}
+	}
+
+	whereStmt := ""
+	if len(whereValues) > 0 {
+		whereStmt = fmt.Sprintf(" WHERE %s", strings.Join(whereValues, " AND "))
+	}
+	selectStmt := fmt.Sprintf("SELECT %s FROM %s %s %s", strings.Join(t.GetSelectableElements(true), ", "), t.FullTableName(), strings.Join(joinStmts, " "), whereStmt)
+	return selectStmt
+}
 
 func (t *Table) GenerateNamedSelectJoinStatement(joinTables ...*Table) string {
 	validTables := []*Table{t}
@@ -180,6 +255,16 @@ func joinMaps(m ...map[string]interface{}) map[string]interface{} {
 	}
 	return output
 }
+
+func (t *Table) FindElementWithName(name string) *Elements {
+	for _, e := range t.Elements {
+		if strings.EqualFold(e.Name, name) {
+			return e
+		}
+	}
+	return nil
+}
+
 func (t *Table) FindCommonElementName(e2List *Table) ([]string, []string) {
 	joinArr := []string{}
 	var whereValues []string

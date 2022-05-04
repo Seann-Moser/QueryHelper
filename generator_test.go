@@ -22,6 +22,36 @@ type Test2 struct {
 	Active bool   `db:"active" default:"true" can_update:"true" joinable:"false" where:"="`
 }
 
+func TestTable_GenerateNamedSelectStatementWithCustomWhere(t *testing.T) {
+	newTable, err := GenerateTableFromStruct("default_db", Test{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "SELECT user_id, name, user_name, created_date, updated_date, active FROM default_db.Test", newTable.GenerateNamedSelectStatementWithCustomWhere())
+
+	assert.Equal(t, "SELECT user_id, name, user_name, created_date, updated_date, active FROM default_db.Test WHERE updated_date = :updated_date", newTable.GenerateNamedSelectStatementWithCustomWhere("updated_date"))
+
+	assert.Equal(t, "SELECT user_id, name, user_name, created_date, updated_date, active FROM default_db.Test", newTable.GenerateNamedSelectStatementWithCustomWhere("updated_dae"))
+
+	newTable2, err := GenerateTableFromStruct("default_dbs", Test2{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "SELECT Test.user_id, Test.name, Test.user_name, Test.created_date, Test.updated_date, Test.active FROM default_db.Test  JOIN default_dbs.Test2 ON Test2.test_id = Test.user_id ", newTable.GenerateNamedSelectJoinStatementWithCustomWhere([]string{}, newTable2))
+
+}
+
+func TestTable_FindElementWithName(t *testing.T) {
+	newTable, err := GenerateTableFromStruct("default_db", Test{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := newTable.FindElementWithName("password")
+	if e == nil {
+		t.Fatal("failed to find element")
+	}
+}
+
 func TestTable_GenerateNamedSelectJoinStatement(t *testing.T) {
 	newTable, err := GenerateTableFromStruct("default_db", Test{})
 	if err != nil {
