@@ -30,6 +30,23 @@ func NewDataset(ctx context.Context, name string, db *sqlx.DB, structsToTables .
 		tables:          map[string]*Table{},
 		ctx:             ctx,
 		DB:              db,
+	}
+	for _, i := range d.structsToTables {
+		err := d.addTable(i)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &d, nil
+}
+func NewDatasetWithCachefunc(ctx context.Context, name string, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
+	d := Dataset{
+		Name:            name,
+		structsToTables: structsToTables,
+		tables:          map[string]*Table{},
+		ctx:             ctx,
+		DB:              db,
 		cache:           cache.New(2*time.Minute, 5*time.Minute),
 	}
 	for _, i := range d.structsToTables {
@@ -58,7 +75,7 @@ func (d *Dataset) GetTable(s interface{}) *Table {
 	return nil
 }
 
-func (d *Dataset) Select(s interface{}, whereStmts ...string) (*sqlx.Rows, error) {
+func (d *Dataset) Select(ctx context.Context, s interface{}, whereStmts ...string) (*sqlx.Rows, error) {
 	if v, found := d.tables[getType(s)]; found {
 		selectStatement := v.GenerateNamedSelectStatement()
 		if len(whereStmts) > 0 {
@@ -69,12 +86,17 @@ func (d *Dataset) Select(s interface{}, whereStmts ...string) (*sqlx.Rows, error
 			return nil, err
 		}
 		key := getCacheKey(b, selectStatement)
-		if v, found := d.cache.Get(key); found {
-			switch t := v.(type) {
-			case sqlx.Rows:
-				return &t, nil
-			case *sqlx.Rows:
-				return t, nil
+		if d.cache != nil {
+			if v, found := d.cache.Get(key); found {
+				if d.Debug {
+					fmt.Printf("loading from cache:%s\n", key)
+				}
+				switch t := v.(type) {
+				case sqlx.Rows:
+					return &t, nil
+				case *sqlx.Rows:
+					return t, nil
+				}
 			}
 		}
 
@@ -86,11 +108,13 @@ func (d *Dataset) Select(s interface{}, whereStmts ...string) (*sqlx.Rows, error
 		if d.Debug {
 			fmt.Printf("select statement: %s\n", selectStatement)
 		}
-		rows, err := d.DB.NamedQueryContext(d.ctx, selectStatement, t)
+		rows, err := d.DB.NamedQueryContext(ctx, selectStatement, t)
 		if err != nil {
 			return nil, err
 		}
-		d.cache.Set(key, rows, cache.DefaultExpiration)
+		if d.cache != nil {
+			d.cache.Set(key, rows, cache.DefaultExpiration)
+		}
 		return rows, nil
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
@@ -102,39 +126,39 @@ func getCacheKey(data []byte, selectStmt string) string {
 	return sha1Hash
 }
 
-func (d *Dataset) Insert(s interface{}) (sql.Result, error) {
+func (d *Dataset) Insert(ctx context.Context, s interface{}) (sql.Result, error) {
 	if v, found := d.tables[getType(s)]; found {
-		return d.DB.NamedExecContext(d.ctx, v.GenerateNamedInsertStatement(), s)
+		return d.DB.NamedExecContext(ctx, v.GenerateNamedInsertStatement(), s)
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
 
-func (d *Dataset) Update(s interface{}) (sql.Result, error) {
+func (d *Dataset) Update(ctx context.Context, s interface{}) (sql.Result, error) {
 	if v, found := d.tables[getType(s)]; found {
-		return d.DB.NamedExecContext(d.ctx, v.GenerateNamedUpdateStatement(), s)
+		return d.DB.NamedExecContext(ctx, v.GenerateNamedUpdateStatement(), s)
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
 
-func (d *Dataset) Delete(s interface{}) (sql.Result, error) {
+func (d *Dataset) Delete(ctx context.Context, s interface{}) (sql.Result, error) {
 	if v, found := d.tables[getType(s)]; found {
-		return d.DB.NamedExecContext(d.ctx, v.GenerateNamedDeleteStatement(), s)
+		return d.DB.NamedExecContext(ctx, v.GenerateNamedDeleteStatement(), s)
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
 
-func (d *Dataset) DeleteAllReferences(s interface{}) (sql.Result, error) {
+func (d *Dataset) DeleteAllReferences(ctx context.Context, s interface{}) (sql.Result, error) {
 	var err error
 	for _, v := range d.tables {
 		if d.Debug {
 			fmt.Printf("delete: %s\n", v.GenerateNamedDeleteStatement())
 		}
-		_, e := d.DB.NamedExecContext(d.ctx, v.GenerateNamedDeleteStatement(), s)
+		_, e := d.DB.NamedExecContext(ctx, v.GenerateNamedDeleteStatement(), s)
 		err = multierr.Combine(err, e)
 	}
 	return nil, err
 }
-func (d *Dataset) SelectJoin(s ...interface{}) (*sqlx.Rows, error) {
+func (d *Dataset) SelectJoin(ctx context.Context, s ...interface{}) (*sqlx.Rows, error) {
 	if v, found := d.tables[getType(s[0])]; found {
 		var tables []*Table
 		for _, t := range s {
@@ -150,12 +174,12 @@ func (d *Dataset) SelectJoin(s ...interface{}) (*sqlx.Rows, error) {
 		if d.Debug {
 			fmt.Printf("joinedSelect: %s\n", query)
 		}
-		return d.DB.NamedQueryContext(d.ctx, query, interface{}(args))
+		return d.DB.NamedQueryContext(ctx, query, interface{}(args))
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
 
-func (d *Dataset) SelectJoinCustomWhere(whereStr []string, s ...interface{}) (*sqlx.Rows, error) {
+func (d *Dataset) SelectJoinCustomWhere(ctx context.Context, whereStr []string, s ...interface{}) (*sqlx.Rows, error) {
 	if v, found := d.tables[getType(s[0])]; found {
 		var tables []*Table
 		for _, t := range s {
@@ -171,12 +195,12 @@ func (d *Dataset) SelectJoinCustomWhere(whereStr []string, s ...interface{}) (*s
 		if d.Debug {
 			fmt.Printf("joinedSelect: %s\n", query)
 		}
-		return d.DB.NamedQueryContext(d.ctx, query, interface{}(args))
+		return d.DB.NamedQueryContext(ctx, query, interface{}(args))
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
 
-func (d *Dataset) SelectJoinDatasets(d2 *Dataset, s ...interface{}) (*sqlx.Rows, error) {
+func (d *Dataset) SelectJoinDatasets(ctx context.Context, d2 *Dataset, s ...interface{}) (*sqlx.Rows, error) {
 	if v, found := d.tables[getType(s[0])]; found {
 		var tables []*Table
 		for _, t := range s {
@@ -194,7 +218,7 @@ func (d *Dataset) SelectJoinDatasets(d2 *Dataset, s ...interface{}) (*sqlx.Rows,
 		if d.Debug {
 			fmt.Printf("joinedSelect: %s\n", query)
 		}
-		return d.DB.NamedQueryContext(d.ctx, query, interface{}(args))
+		return d.DB.NamedQueryContext(ctx, query, interface{}(args))
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
