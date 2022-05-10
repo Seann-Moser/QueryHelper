@@ -40,7 +40,7 @@ func NewDataset(ctx context.Context, name string, db *sqlx.DB, structsToTables .
 
 	return &d, nil
 }
-func NewDatasetWithCachefunc(ctx context.Context, name string, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
+func NewDatasetWithCache(ctx context.Context, name string, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
 	d := Dataset{
 		Name:            name,
 		structsToTables: structsToTables,
@@ -86,18 +86,8 @@ func (d *Dataset) Select(ctx context.Context, s interface{}, whereStmts ...strin
 			return nil, err
 		}
 		key := getCacheKey(b, selectStatement)
-		if d.cache != nil {
-			if v, found := d.cache.Get(key); found {
-				if d.Debug {
-					fmt.Printf("loading from cache:%s\n", key)
-				}
-				switch t := v.(type) {
-				case sqlx.Rows:
-					return &t, nil
-				case *sqlx.Rows:
-					return t, nil
-				}
-			}
+		if v := d.GetCache(key); v != nil {
+			return v, nil
 		}
 
 		t := map[string]interface{}{}
@@ -119,6 +109,24 @@ func (d *Dataset) Select(ctx context.Context, s interface{}, whereStmts ...strin
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
+
+func (d *Dataset) GetCache(key string) *sqlx.Rows {
+	if d.cache != nil {
+		if v, found := d.cache.Get(key); found {
+			if d.Debug {
+				fmt.Printf("loading from cache:%s\n", key)
+			}
+			switch t := v.(type) {
+			case sqlx.Rows:
+				return &t
+			case *sqlx.Rows:
+				return t
+			}
+		}
+	}
+	return nil
+}
+
 func getCacheKey(data []byte, selectStmt string) string {
 	h := sha1.New()
 	h.Write(append(data, []byte(selectStmt)...))
