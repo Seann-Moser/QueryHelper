@@ -38,6 +38,7 @@ const (
 func (g *Generator) qConfigParser(data string, p reflect.Type) (*Config, error) {
 	dataPoints := strings.Split(data, ",")
 	con := map[string]interface{}{}
+	con["select"] = true
 	for _, row := range dataPoints {
 		v := strings.Split(row, ":")
 		key := v[0]

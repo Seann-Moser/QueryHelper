@@ -96,14 +96,20 @@ func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...*
 	}
 
 	var selectValues []string
+	var dedupMap map[string]bool
 	for _, validTable := range validTables {
 		if len(selectValues) == 0 {
 			selectValues = append(selectValues, validTable.GetSelectableElements(true)...)
 		} else {
 			for _, e := range validTable.GetSelectableElements(true) {
 				for _, s := range selectCol {
-					if strings.EqualFold(s, e) {
+					eleName := e[strings.Index(e, ".")+1:]
+					if _, found := dedupMap[eleName]; found {
+						break
+					}
+					if strings.EqualFold(s, eleName) {
 						selectValues = append(selectValues, e)
+						dedupMap[eleName] = true
 						break
 					}
 				}
