@@ -41,10 +41,10 @@ func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*Config, e
 	con["select"] = true
 	for _, row := range dataPoints {
 		v := strings.Split(row, ":")
-		key := v[0]
+		key := strings.TrimSpace(v[0])
 		value := ""
 		if len(v) > 1 {
-			value = v[1]
+			value = strings.TrimSpace(v[1])
 		}
 		switch key {
 		case "primary", "join", "select", "update", "skip", "null":

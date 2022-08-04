@@ -8,7 +8,6 @@ import (
 	"reflect"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/patrickmn/go-cache"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 
@@ -21,9 +20,9 @@ type Dataset struct {
 	Tables          map[string]*table.Table
 	ctx             context.Context
 	DB              *sqlx.DB
-	cache           *cache.Cache
 	logger          *zap.Logger
 	generator       *table.Generator
+	dryRun          bool
 }
 
 func NewDataset(ctx context.Context, name string, logger *zap.Logger, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
@@ -35,6 +34,7 @@ func NewDataset(ctx context.Context, name string, logger *zap.Logger, db *sqlx.D
 		DB:              db,
 		logger:          logger,
 		generator:       table.NewGenerator(db, false, logger),
+		dryRun:          db == nil,
 	}
 	for _, i := range d.structsToTables {
 		err := d.addTable(i)

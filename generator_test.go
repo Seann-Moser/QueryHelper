@@ -40,7 +40,6 @@ func TestV2Table(t *testing.T) {
 		println(t.InsertStatement())
 	}
 	ds.SelectJoin(context.Background(), []string{"user_name", "name", "test_id"}, nil, Test{}, Test2{})
-
 }
 
 func TestTable_GenerateNamedSelectStatementWithCustomWhere(t *testing.T) {
