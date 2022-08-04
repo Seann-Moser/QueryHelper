@@ -1,13 +1,9 @@
 package QueryHelper
 
 import (
-	"context"
 	"testing"
 
 	"github.com/tj/assert"
-	"go.uber.org/zap"
-
-	"github.com/Seann-Moser/QueryHelper/v2/dataset"
 )
 
 type Test struct {
@@ -24,22 +20,6 @@ type Test2 struct {
 	TestID string `db:"test_id" join_name:"id" q_config:"join,select,join_name:id"`
 	Name   string `db:"name"  table:"primary" where:"=" joinable:"false"`
 	Active bool   `db:"active" default:"true" can_update:"true" joinable:"false" where:"="`
-}
-
-func TestV2Table(t *testing.T) {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		t.Fatal(err)
-	}
-	ds, err := dataset.NewDataset(context.Background(), "test", logger, nil, Test{}, Test2{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, t := range ds.Tables {
-		println(t.FullTableName())
-		println(t.InsertStatement())
-	}
-	ds.SelectJoin(context.Background(), []string{"user_name", "name", "test_id"}, nil, Test{}, Test2{})
 }
 
 func TestTable_GenerateNamedSelectStatementWithCustomWhere(t *testing.T) {
