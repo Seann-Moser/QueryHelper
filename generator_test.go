@@ -7,7 +7,7 @@ import (
 )
 
 type Test struct {
-	UserID      string `db:"user_id" join_name:"id" delete:"true"`
+	UserID      string `db:"user_id" join_name:"id" delete:"true" q_config:"join,select,join_name:id"`
 	Name        string `db:"name" default:"jon smith" table:"primary"`
 	UserName    string `db:"user_name" update:"true" can_be_null:"false" can_update:"true"`
 	CreatedDate string `db:"created_date" default:"NOW()" data_type:"timestamp" table:"skip_insert"`
@@ -17,7 +17,7 @@ type Test struct {
 }
 
 type Test2 struct {
-	TestID string `db:"test_id" join_name:"id"`
+	TestID string `db:"test_id" join_name:"id" q_config:"join,select,join_name:id"`
 	Name   string `db:"name"  table:"primary" where:"=" joinable:"false"`
 	Active bool   `db:"active" default:"true" can_update:"true" joinable:"false" where:"="`
 }

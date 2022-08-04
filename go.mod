@@ -7,6 +7,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/tj/assert v0.0.3
 	go.uber.org/multierr v1.8.0
+	go.uber.org/zap v1.21.0
 )
 
 require (

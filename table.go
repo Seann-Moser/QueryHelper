@@ -45,6 +45,7 @@ func (t *Table) GenerateNamedInsertStatement() string {
 		strings.Join(columnNames, ","), strings.Join(values, ","))
 	return insert
 }
+
 func (t *Table) GenerateNamedUpdateStatement() string {
 	var setValues []string
 	var whereValues []string
