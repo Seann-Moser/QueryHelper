@@ -35,7 +35,7 @@ const (
 	TableTime        = "timestamp"
 )
 
-func (g *Generator) qConfigParser(data string, p reflect.Type) (*Config, error) {
+func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*Config, error) {
 	dataPoints := strings.Split(data, ",")
 	con := map[string]interface{}{}
 	con["select"] = true
@@ -58,7 +58,7 @@ func (g *Generator) qConfigParser(data string, p reflect.Type) (*Config, error) 
 			}
 		case "where", "join_name", "data_type", "default", "where_join", "foreign_key", "foreign_table":
 			if key == "data_type" {
-				con[key] = convertTypeToSql(p)
+				con[key] = convertTypeToSql(name, p)
 			}
 			con[key] = value
 
@@ -87,17 +87,18 @@ func (g *Generator) TableFromStruct(database string, s interface{}) (*Table, err
 	structType := reflect.TypeOf(s)
 	for i := 0; i < structType.NumField(); i++ {
 		e := &Config{}
-		e.Name = structType.Field(i).Tag.Get("db")
+		name := structType.Field(i).Tag.Get("db")
 
 		if e.Name == "" {
 			e.Name = structType.Field(i).Name
 		}
 		if value := structType.Field(i).Tag.Get("q_config"); value != "" {
 			// q_config:primary,update,select,join,join_name:name,data_type:var(128),skip,default:TIMESTAMP(),null
-			e, err = g.qConfigParser(value, structType.Field(i).Type)
+			e, err = g.qConfigParser(name, value, structType.Field(i).Type)
 			if err != nil {
 				g.logger.Error("failed parsing q_config", zap.String("q_config", value), zap.Error(err))
 			}
+			e.Name = name
 
 		}
 		newTable.Elements = append(newTable.Elements, e)
@@ -168,7 +169,13 @@ func getType(myvar interface{}) string {
 	}
 }
 
-func convertTypeToSql(v reflect.Type) string {
+func convertTypeToSql(name string, v reflect.Type) string {
+	if strings.Contains(name, "timestamp") {
+		return "TIMESTAMP"
+	}
+	if strings.Contains(name, "date") {
+		return "DATE"
+	}
 	switch v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return TableTypeInt
