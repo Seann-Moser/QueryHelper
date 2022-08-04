@@ -56,19 +56,19 @@ import (
 )
 
 type Test struct {
-	UserID      string `db:"user_id" join_name:"id" delete:"true" q_config:"join,select,join_name:id"`
-	Name        string `db:"name" default:"jon smith" table:"primary"`
-	UserName    string `db:"user_name" update:"true" can_be_null:"false" can_update:"true"`
-	CreatedDate string `db:"created_date" default:"NOW()" data_type:"timestamp" table:"skip_insert"`
-	Password    string `db:"password" selectable:"false" where:"="`
-	UpdatedDate string `db:"updated_date" default:"" data_type:"timestamp" table:"skip_insert" can_be_null:"true" can_update:"true"`
-	Active      bool   `db:"active" default:"true" can_update:"true" where:"="`
+	UserID      string `db:"user_id" q_config:"join,select,join_name:id"`
+	Name        string `db:"name"`
+	UserName    string `db:"user_name"`
+	CreatedDate string `db:"created_date"`
+	Password    string `db:"password"`
+	UpdatedDate string `db:"updated_date"`
+	Active      bool   `db:"active"`
 }
 
 type Test2 struct {
-	TestID string `db:"test_id" join_name:"id" q_config:"join,select,join_name:id"`
-	Name   string `db:"name"  table:"primary" where:"=" joinable:"false"`
-	Active bool   `db:"active" default:"true" can_update:"true" joinable:"false" where:"="`
+	TestID string `db:"test_id" q_config:"join,select,join_name:id"`
+	Name   string `db:"name"`
+	Active bool   `db:"active"`
 }
 
 func main() {
