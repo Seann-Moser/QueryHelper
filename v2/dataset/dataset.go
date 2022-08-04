@@ -18,7 +18,7 @@ import (
 type Dataset struct {
 	Name            string
 	structsToTables []interface{}
-	tables          map[string]*table.Table
+	Tables          map[string]*table.Table
 	ctx             context.Context
 	DB              *sqlx.DB
 	cache           *cache.Cache
@@ -30,7 +30,7 @@ func NewDataset(ctx context.Context, name string, logger *zap.Logger, db *sqlx.D
 	d := Dataset{
 		Name:            name,
 		structsToTables: structsToTables,
-		tables:          map[string]*table.Table{},
+		Tables:          map[string]*table.Table{},
 		ctx:             ctx,
 		DB:              db,
 		logger:          logger,
@@ -53,12 +53,12 @@ func (d *Dataset) addTable(s interface{}) error {
 	}
 	d.logger.Debug("add_table",
 		zap.String("table", ts.FullTableName()), zap.Int("total_elements", len(ts.Elements)))
-	d.tables[getType(s)] = ts
+	d.Tables[getType(s)] = ts
 	return d.generator.CreateMySqlTable(d.ctx, ts)
 }
 
 func (d *Dataset) GetTable(s interface{}) *table.Table {
-	if v, found := d.tables[getType(s)]; found {
+	if v, found := d.Tables[getType(s)]; found {
 		return v
 	}
 	return nil
@@ -73,7 +73,7 @@ func getType(myvar interface{}) string {
 }
 
 func (d *Dataset) Insert(ctx context.Context, s interface{}) (sql.Result, error) {
-	if v, found := d.tables[getType(s)]; found {
+	if v, found := d.Tables[getType(s)]; found {
 		d.logger.Debug("insert", zap.String("query", v.InsertStatement()))
 		return d.DB.NamedExecContext(ctx, v.InsertStatement(), s)
 	}
@@ -81,7 +81,7 @@ func (d *Dataset) Insert(ctx context.Context, s interface{}) (sql.Result, error)
 }
 
 func (d *Dataset) Update(ctx context.Context, s interface{}) (sql.Result, error) {
-	if v, found := d.tables[getType(s)]; found {
+	if v, found := d.Tables[getType(s)]; found {
 		d.logger.Debug("update", zap.String("query", v.UpdateStatement()))
 		return d.DB.NamedExecContext(ctx, v.UpdateStatement(), s)
 	}
@@ -89,7 +89,7 @@ func (d *Dataset) Update(ctx context.Context, s interface{}) (sql.Result, error)
 }
 
 func (d *Dataset) Delete(ctx context.Context, s interface{}) (sql.Result, error) {
-	if v, found := d.tables[getType(s)]; found {
+	if v, found := d.Tables[getType(s)]; found {
 		d.logger.Debug("delete", zap.String("query", v.DeleteStatement()))
 		return d.DB.NamedExecContext(ctx, v.DeleteStatement(), s)
 	}
@@ -97,7 +97,7 @@ func (d *Dataset) Delete(ctx context.Context, s interface{}) (sql.Result, error)
 }
 
 func (d *Dataset) Count(ctx context.Context, s interface{}, conditional string, whereStmt ...string) (sql.Result, error) {
-	if v, found := d.tables[getType(s)]; found {
+	if v, found := d.Tables[getType(s)]; found {
 		d.logger.Debug("count", zap.String("query", v.Count(conditional, whereStmt...)))
 		return d.DB.NamedExecContext(ctx, v.Count(conditional, whereStmt...), s)
 	}
@@ -106,7 +106,7 @@ func (d *Dataset) Count(ctx context.Context, s interface{}, conditional string, 
 
 func (d *Dataset) DeleteAllReferences(ctx context.Context, s interface{}) (sql.Result, error) {
 	var err error
-	for _, v := range d.tables {
+	for _, v := range d.Tables {
 		query := v.DeleteStatement()
 		d.logger.Debug("delete", zap.String("query", query))
 		_, e := d.DB.NamedExecContext(ctx, query, s)
@@ -116,10 +116,10 @@ func (d *Dataset) DeleteAllReferences(ctx context.Context, s interface{}) (sql.R
 }
 
 func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, s ...interface{}) (*sqlx.Rows, error) {
-	if v, found := d.tables[getType(s[0])]; found {
+	if v, found := d.Tables[getType(s[0])]; found {
 		var tables []*table.Table
 		for _, t := range s {
-			if v, found := d.tables[getType(t)]; found {
+			if v, found := d.Tables[getType(t)]; found {
 				tables = append(tables, v)
 			}
 		}

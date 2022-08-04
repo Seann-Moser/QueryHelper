@@ -76,7 +76,7 @@ func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...*
 		if len(commonElements) == 0 {
 			continue
 		}
-		if len(whereElementsStr) == 0 {
+		if whereElementsStr == nil || len(whereElementsStr) == 0 {
 			whereValues = append(whereValues, wv...)
 		} else {
 			for _, i := range whereElementsStr {
@@ -97,13 +97,14 @@ func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...*
 
 	var selectValues []string
 	var dedupMap map[string]bool
+	dedupMap = map[string]bool{}
 	for _, validTable := range validTables {
-		if len(selectValues) == 0 {
+		if selectCol == nil || len(selectCol) == 0 {
 			selectValues = append(selectValues, validTable.GetSelectableElements(true)...)
 		} else {
 			for _, e := range validTable.GetSelectableElements(true) {
 				for _, s := range selectCol {
-					eleName := e[strings.Index(e, ".")+1:]
+					eleName := strings.TrimSpace(e[strings.Index(e, "AS")+2:])
 					if _, found := dedupMap[eleName]; found {
 						break
 					}
@@ -133,6 +134,7 @@ func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...*
 	if len(whereValues) > 0 {
 		whereStmt = fmt.Sprintf(" WHERE %s", strings.Join(whereValues, " AND "))
 	}
-	selectStmt := fmt.Sprintf("SELECT %s FROM %s %s %s", strings.Join(t.GetSelectableElements(true), ", "), t.FullTableName(), strings.Join(joinStmts, " "), whereStmt)
+	strings.Join(selectValues, ",")
+	selectStmt := fmt.Sprintf("SELECT %s FROM %s %s %s", strings.Join(selectValues, ","), t.FullTableName(), strings.Join(joinStmts, " "), whereStmt)
 	return selectStmt
 }

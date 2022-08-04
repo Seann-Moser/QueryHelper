@@ -86,9 +86,9 @@ func (g *Generator) TableFromStruct(database string, s interface{}) (*Table, err
 
 	structType := reflect.TypeOf(s)
 	for i := 0; i < structType.NumField(); i++ {
-		e := &Config{}
+		e := &Config{Select: true, Primary: true}
 		name := structType.Field(i).Tag.Get("db")
-
+		e.Name = name
 		if e.Name == "" {
 			e.Name = structType.Field(i).Name
 		}
@@ -109,9 +109,11 @@ func (g *Generator) TableFromStruct(database string, s interface{}) (*Table, err
 
 func (g *Generator) CreateMySqlTable(ctx context.Context, t *Table) error {
 	createSchema := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;", t.Dataset)
-	_, err := g.db.ExecContext(ctx, createSchema)
-	if err != nil {
-		return fmt.Errorf("err: %v, schema: %s", err, createSchema)
+	if g.db != nil {
+		_, err := g.db.ExecContext(ctx, createSchema)
+		if err != nil {
+			return fmt.Errorf("err: %v, schema: %s", err, createSchema)
+		}
 	}
 	var PrimaryKeys []string
 	var FK []string

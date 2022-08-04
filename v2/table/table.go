@@ -115,7 +115,7 @@ func (t *Table) GetSelectableElements(fullNames bool) []string {
 	for _, e := range t.Elements {
 		if e.Select {
 			if fullNames {
-				selectValues = append(selectValues, t.FullElementName(e))
+				selectValues = append(selectValues, fmt.Sprintf("%s AS %s", t.FullElementName(e), e.Name)) //
 			} else {
 				selectValues = append(selectValues, e.Name)
 			}
