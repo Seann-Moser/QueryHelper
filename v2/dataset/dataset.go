@@ -25,7 +25,7 @@ type Dataset struct {
 	dryRun          bool
 }
 
-func NewDataset(ctx context.Context, name string, logger *zap.Logger, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
+func NewDataset(ctx context.Context, name string, dropTable bool, logger *zap.Logger, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
 	d := Dataset{
 		Name:            name,
 		structsToTables: structsToTables,
@@ -33,7 +33,7 @@ func NewDataset(ctx context.Context, name string, logger *zap.Logger, db *sqlx.D
 		ctx:             ctx,
 		DB:              db,
 		logger:          logger,
-		generator:       table.NewGenerator(db, false, logger),
+		generator:       table.NewGenerator(db, dropTable, logger),
 		dryRun:          db == nil,
 	}
 	for _, i := range d.structsToTables {
