@@ -24,6 +24,16 @@ func (t *Table) InsertStatement() string {
 		strings.Join(columnNames, ","), strings.Join(values, ","))
 	return insert
 }
+func (t *Table) SelectStatement(where ...string) string {
+	var selectValues = t.GetSelectableElements(false)
+	whereStmt := ""
+	if len(where) > 0 {
+		whereStmt = t.WhereStatement("AND", where...)
+	}
+	selectStmt := fmt.Sprintf("SELECT %s FROM %s.%s", strings.Join(selectValues, ", "), t.Dataset, t.Name)
+	selectStmt += whereStmt
+	return selectStmt
+}
 
 func (t *Table) UpdateStatement() string {
 	var setValues []string
