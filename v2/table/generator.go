@@ -39,6 +39,7 @@ func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*Config, e
 	dataPoints := strings.Split(data, ",")
 	con := map[string]interface{}{}
 	con["select"] = true
+	con["data_type"] = convertTypeToSql(name, p)
 	for _, row := range dataPoints {
 		v := strings.Split(row, ":")
 		key := strings.TrimSpace(v[0])
