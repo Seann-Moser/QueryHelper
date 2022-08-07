@@ -115,7 +115,7 @@ func (d *Dataset) DeleteAllReferences(ctx context.Context, s interface{}) (sql.R
 	return nil, err
 }
 
-func (d *Dataset) Select(ctx context.Context, s interface{}, t any, whereStmts ...string) (*sqlx.Rows, error) {
+func (d *Dataset) Select(ctx context.Context, s interface{}, whereStmts ...string) (*sqlx.Rows, error) {
 	if v, found := d.Tables[getType(s)]; found {
 		selectStatement := v.SelectStatement(whereStmts...)
 		b, err := json.Marshal(s)
