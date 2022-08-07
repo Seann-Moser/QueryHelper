@@ -14,7 +14,7 @@ type Config struct {
 	Name         string
 	Type         string `json:"data_type"`
 	Default      string `json:"default"`
-	Primary      bool   `json:"primary_key"`
+	Primary      bool   `json:"primary"`
 	ForeignKey   string `json:"foreign_key"`
 	ForeignTable string `json:"foreign_table"`
 	Skip         bool   `json:"skip"`
