@@ -12,7 +12,7 @@ type Table struct {
 }
 type Config struct {
 	Name         string
-	Type         string `json:"type"`
+	Type         string `json:"data_type"`
 	Default      string `json:"default"`
 	Primary      bool   `json:"primary_key"`
 	ForeignKey   string `json:"foreign_key"`
