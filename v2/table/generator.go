@@ -86,8 +86,9 @@ func (g *Generator) TableFromStruct(database string, s interface{}) (*Table, err
 	}
 
 	structType := reflect.TypeOf(s)
+	var setPrimary bool
 	for i := 0; i < structType.NumField(); i++ {
-		e := &Config{Select: true, Primary: true}
+		e := &Config{Select: true, Primary: false}
 		name := structType.Field(i).Tag.Get("db")
 		e.Name = name
 		if e.Name == "" {
@@ -101,10 +102,18 @@ func (g *Generator) TableFromStruct(database string, s interface{}) (*Table, err
 			}
 			e.Name = name
 
+		} else {
+			e, err = g.qConfigParser(name, "", structType.Field(i).Type)
+			e.Name = name
+		}
+		if e.Primary {
+			setPrimary = true
 		}
 		newTable.Elements = append(newTable.Elements, e)
 	}
-
+	if !setPrimary {
+		newTable.Elements[0].Primary = true
+	}
 	return &newTable, nil
 }
 
