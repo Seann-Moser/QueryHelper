@@ -114,13 +114,17 @@ func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...*
 		} else {
 			for _, e := range validTable.GetSelectableElements(true) {
 				for _, s := range selectCol {
+					if _, found := dedupMap[e]; found {
+						break
+					}
 					eleName := strings.TrimSpace(e[strings.Index(e, "AS")+2:])
 					if _, found := dedupMap[eleName]; found {
 						break
 					}
-					if strings.EqualFold(s, eleName) {
+					if strings.EqualFold(s, eleName) || strings.EqualFold(s, e) {
 						selectValues = append(selectValues, e)
 						dedupMap[eleName] = true
+						dedupMap[e] = true
 						break
 					}
 				}
