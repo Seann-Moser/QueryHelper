@@ -30,7 +30,7 @@ func (t *Table) SelectStatement(where ...string) string {
 	if len(where) > 0 {
 		whereStmt = t.WhereStatement("AND", where...)
 	}
-	selectStmt := fmt.Sprintf("SELECT %s FROM %s.%s", strings.Join(selectValues, ", "), t.Dataset, t.Name)
+	selectStmt := fmt.Sprintf("SELECT %s FROM %s.%s ", strings.Join(selectValues, ", "), t.Dataset, t.Name)
 	selectStmt += whereStmt
 	return selectStmt
 }
