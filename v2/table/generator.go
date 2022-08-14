@@ -182,12 +182,6 @@ func getType(myvar interface{}) string {
 }
 
 func convertTypeToSql(name string, v reflect.Type) string {
-	if strings.Contains(name, "timestamp") {
-		return "TIMESTAMP"
-	}
-	if strings.Contains(name, "date") {
-		return "DATE"
-	}
 	switch v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return TableTypeInt
@@ -198,6 +192,12 @@ func convertTypeToSql(name string, v reflect.Type) string {
 	case reflect.Bool:
 		return TableTypeBool
 	default:
+		if strings.Contains(name, "timestamp") {
+			return "TIMESTAMP"
+		}
+		if strings.Contains(name, "date") {
+			return "DATE"
+		}
 		return TableTypeText
 	}
 }
