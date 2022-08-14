@@ -59,7 +59,7 @@ func (t *Table) WhereStatement(conditional string, whereElementsStr ...string) s
 			if element.Where == "" {
 				tmp = "="
 			}
-			whereValues = append(whereValues, fmt.Sprintf("%s %s :%s", element.Name, tmp, element.Name))
+			whereValues = append(whereValues, fmt.Sprintf("%s %s :%s", t.FullElementName(element), tmp, element.Name))
 		}
 	}
 	if len(whereValues) == 0 {
