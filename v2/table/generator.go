@@ -61,8 +61,7 @@ func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*Config, e
 			if key == "data_type" {
 				con[key] = convertTypeToSql(name, p)
 			}
-			con[key] = value
-
+			con[key] = strings.ReplaceAll(value, "{{comma}}", ",")
 		}
 
 	}
