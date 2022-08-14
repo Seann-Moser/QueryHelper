@@ -153,7 +153,7 @@ func (g *Generator) CreateMySqlTable(ctx context.Context, t *Table) error {
 			PrimaryKeys = append(PrimaryKeys, element.Name)
 		}
 		if len(element.ForeignKey) > 0 && len(element.ForeignTable) > 0 {
-			FK = append(FK, fmt.Sprintf("\n\tFOREIGN KEY (%s) REFERENCES (%s.%s)", element.Name, element.ForeignTable, element.ForeignKey))
+			FK = append(FK, fmt.Sprintf("\n\tFOREIGN KEY (%s) REFERENCES %s (%s)", element.Name, element.ForeignTable, element.ForeignKey))
 		}
 	}
 	if len(PrimaryKeys) == 0 {
