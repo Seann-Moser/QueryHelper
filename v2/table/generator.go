@@ -160,7 +160,7 @@ func (g *Generator) CreateMySqlTable(ctx context.Context, t *Table) error {
 
 	}
 	if len(FK) > 0 {
-		createString += strings.Join(FK, ",")
+		createString += "," + strings.Join(FK, ",")
 	}
 	createString += "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8;"
 	g.logger.Debug("creating table", zap.String("create_table", createString))
