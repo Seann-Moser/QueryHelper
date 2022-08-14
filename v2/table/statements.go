@@ -109,7 +109,7 @@ func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...*
 	var dedupMap map[string]bool
 	dedupMap = map[string]bool{}
 	for _, validTable := range validTables {
-		if selectCol == nil || len(selectCol) == 0 {
+		if (selectCol == nil || len(selectCol) == 0) && len(selectValues) == 0 {
 			selectValues = append(selectValues, validTable.GetSelectableElements(true)...)
 		} else {
 			for _, e := range validTable.GetSelectableElements(true) {
