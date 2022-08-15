@@ -59,7 +59,7 @@ func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*Config, e
 			}
 		case "where", "join_name", "data_type", "default", "where_join", "foreign_key", "foreign_table":
 			if key == "data_type" {
-				con[key] = convertTypeToSql(name, p)
+				con["data_type"] = value
 			}
 			con[key] = strings.ReplaceAll(value, "{{comma}}", ",")
 		}
