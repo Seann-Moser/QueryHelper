@@ -81,6 +81,19 @@ func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...*
 	validTables := []*Table{t}
 	joinStmts := []string{}
 	var whereValues []string
+	for _, i := range whereElementsStr {
+		element := t.FindElementWithName(i)
+		if element != nil {
+			tmp := element.Where
+			if element.Where == "" {
+				tmp = "="
+			}
+			formatted := fmt.Sprintf("%s %s :%s", t.FullElementName(element), tmp, element.Name)
+			if strings.Contains(formatted, ".") {
+				whereValues = append(whereValues, formatted)
+			}
+		}
+	}
 	for _, currentTable := range joinTables {
 		commonElements, wv := t.FindCommonElementName(currentTable)
 		if len(commonElements) == 0 {
@@ -96,7 +109,7 @@ func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...*
 					if element.Where == "" {
 						tmp = "="
 					}
-					formatted := fmt.Sprintf("%s %s :%s", t.FullElementName(element), tmp, element.Name)
+					formatted := fmt.Sprintf("%s %s :%s", currentTable.FullElementName(element), tmp, element.Name)
 					if strings.Contains(formatted, ".") {
 						whereValues = append(whereValues, formatted)
 					}

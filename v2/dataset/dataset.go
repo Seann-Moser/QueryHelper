@@ -151,6 +151,9 @@ func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, 
 		}
 		query := v.SelectJoin(selectCol, whereStr, tables[1:]...)
 		d.logger.Debug("select_join", zap.String("query", query))
+		if d.DB == nil {
+			return nil, err
+		}
 		return d.DB.NamedQueryContext(ctx, query, interface{}(args))
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
