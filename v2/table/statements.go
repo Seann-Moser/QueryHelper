@@ -41,7 +41,6 @@ func (t *Table) UpdateStatement() string {
 	for _, e := range t.Elements {
 		if e.Primary {
 			whereValues = append(whereValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
-			continue
 		}
 		if !e.Update {
 			continue
@@ -51,9 +50,8 @@ func (t *Table) UpdateStatement() string {
 	if len(setValues) == 0 {
 		return ""
 	}
-	update := fmt.Sprintf("UPDATE %s.%s SET %s WHERE %s",
-		t.Dataset,
-		t.Name,
+	update := fmt.Sprintf("UPDATE %s SET %s WHERE %s",
+		t.FullTableName(),
 		strings.Join(setValues, " ,"), strings.Join(whereValues, " AND "))
 	return update
 }
@@ -81,6 +79,19 @@ func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...*
 	validTables := []*Table{t}
 	joinStmts := []string{}
 	var whereValues []string
+	for _, i := range whereElementsStr {
+		element := t.FindElementWithName(i)
+		if element != nil {
+			tmp := element.Where
+			if element.Where == "" {
+				tmp = "="
+			}
+			formatted := fmt.Sprintf("%s %s :%s", t.FullElementName(element), tmp, element.Name)
+			if strings.Contains(formatted, ".") {
+				whereValues = append(whereValues, formatted)
+			}
+		}
+	}
 	for _, currentTable := range joinTables {
 		commonElements, wv := t.FindCommonElementName(currentTable)
 		if len(commonElements) == 0 {
@@ -96,7 +107,7 @@ func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...*
 					if element.Where == "" {
 						tmp = "="
 					}
-					formatted := fmt.Sprintf("%s %s :%s", t.FullElementName(element), tmp, element.Name)
+					formatted := fmt.Sprintf("%s %s :%s", currentTable.FullElementName(element), tmp, element.Name)
 					if strings.Contains(formatted, ".") {
 						whereValues = append(whereValues, formatted)
 					}

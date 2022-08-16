@@ -47,7 +47,7 @@ func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*Config, e
 		if len(v) > 1 {
 			value = strings.TrimSpace(v[1])
 		}
-		switch key {
+		switch strings.ToLower(key) {
 		case "primary", "join", "select", "update", "skip", "null":
 			if value != "" {
 				t, err := strconv.ParseBool(value)
