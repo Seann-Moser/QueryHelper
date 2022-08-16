@@ -41,7 +41,6 @@ func (t *Table) UpdateStatement() string {
 	for _, e := range t.Elements {
 		if e.Primary {
 			whereValues = append(whereValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
-			continue
 		}
 		if !e.Update {
 			continue
@@ -51,9 +50,8 @@ func (t *Table) UpdateStatement() string {
 	if len(setValues) == 0 {
 		return ""
 	}
-	update := fmt.Sprintf("UPDATE %s.%s SET %s WHERE %s",
-		t.Dataset,
-		t.Name,
+	update := fmt.Sprintf("UPDATE %s SET %s WHERE %s",
+		t.FullTableName(),
 		strings.Join(setValues, " ,"), strings.Join(whereValues, " AND "))
 	return update
 }
