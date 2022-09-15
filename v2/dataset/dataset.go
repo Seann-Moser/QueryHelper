@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/multierr"
@@ -110,6 +111,10 @@ func (d *Dataset) DeleteAllReferences(ctx context.Context, s interface{}) (sql.R
 		query := v.DeleteStatement()
 		d.logger.Debug("delete", zap.String("query", query))
 		_, e := d.DB.NamedExecContext(ctx, query, s)
+		if err != nil && !strings.Contains(e.Error(), "could not find") {
+			err = multierr.Combine(err, e)
+
+		}
 		err = multierr.Combine(err, e)
 	}
 	return nil, err
