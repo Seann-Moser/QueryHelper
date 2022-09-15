@@ -115,7 +115,6 @@ func (d *Dataset) DeleteAllReferences(ctx context.Context, s interface{}) (sql.R
 			err = multierr.Combine(err, e)
 
 		}
-		err = multierr.Combine(err, e)
 	}
 	return nil, err
 }
