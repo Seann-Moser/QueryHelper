@@ -24,9 +24,10 @@ type Dataset struct {
 	logger          *zap.Logger
 	generator       *table.Generator
 	dryRun          bool
+	createTables    bool
 }
 
-func NewDataset(ctx context.Context, name string, dropTable bool, logger *zap.Logger, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
+func NewDataset(ctx context.Context, name string, createTable, dropTable bool, logger *zap.Logger, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
 	d := Dataset{
 		Name:            name,
 		structsToTables: structsToTables,
@@ -36,9 +37,10 @@ func NewDataset(ctx context.Context, name string, dropTable bool, logger *zap.Lo
 		logger:          logger,
 		generator:       table.NewGenerator(db, dropTable, logger),
 		dryRun:          db == nil,
+		createTables:    createTable,
 	}
 	for _, i := range d.structsToTables {
-		err := d.addTable(i)
+		err := d.AddTable(i)
 		if err != nil {
 			return nil, err
 		}
@@ -47,15 +49,19 @@ func NewDataset(ctx context.Context, name string, dropTable bool, logger *zap.Lo
 	return &d, nil
 }
 
-func (d *Dataset) addTable(s interface{}) error {
+func (d *Dataset) AddTable(s interface{}) error {
 	ts, err := d.generator.TableFromStruct(d.Name, s)
 	if err != nil {
 		return err
 	}
 	d.logger.Debug("add_table",
-		zap.String("table", ts.FullTableName()), zap.Int("total_elements", len(ts.Elements)))
+		zap.String("table", ts.FullTableName()),
+		zap.Int("total_elements", len(ts.Elements)))
 	d.Tables[getType(s)] = ts
-	return d.generator.CreateMySqlTable(d.ctx, ts)
+	if d.createTables {
+		return d.generator.CreateMySqlTable(d.ctx, ts)
+	}
+	return nil
 }
 
 func (d *Dataset) GetTable(s interface{}) *table.Table {
@@ -120,25 +126,32 @@ func (d *Dataset) DeleteAllReferences(ctx context.Context, s interface{}) (sql.R
 }
 
 func (d *Dataset) Select(ctx context.Context, s interface{}, whereStmts ...string) (*sqlx.Rows, error) {
+	stmt, err := d.SelectStatement(s, whereStmts...)
+	if err != nil {
+		return nil, err
+	}
+	b, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	t := map[string]interface{}{}
+	err = json.Unmarshal(b, &t)
+	if err != nil {
+		return nil, err
+	}
+
+	d.logger.Debug("select", zap.String("query", stmt))
+	return d.DB.NamedQueryContext(ctx, stmt, t)
+
+}
+
+func (d *Dataset) SelectStatement(s interface{}, whereStmts ...string) (string, error) {
 	if v, found := d.Tables[getType(s)]; found {
 		selectStatement := v.SelectStatement(whereStmts...)
-		b, err := json.Marshal(s)
-		if err != nil {
-			return nil, err
-		}
-		t := map[string]interface{}{}
-		err = json.Unmarshal(b, &t)
-		if err != nil {
-			return nil, err
-		}
 		d.logger.Debug("select", zap.String("query", selectStatement))
-		rows, err := d.DB.NamedQueryContext(ctx, selectStatement, t)
-		if err != nil {
-			return nil, err
-		}
-		return rows, nil
+		return selectStatement, nil
 	}
-	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
+	return "", fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
 
 func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, s ...interface{}) (*sqlx.Rows, error) {
