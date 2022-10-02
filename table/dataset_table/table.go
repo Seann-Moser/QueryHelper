@@ -95,7 +95,11 @@ func (t *DefaultTable) FindCommonElementName(e2List Table) ([]string, []string) 
 			continue
 		}
 		for _, e2 := range e2List.GetElements() {
-			if (e2.Name == columnName || e2.JoinName == columnName) && e2.Join {
+			e2ColName := e2.Name
+			if e2.JoinName != "" {
+				e2ColName = e2.JoinName
+			}
+			if strings.EqualFold(e2ColName, columnName) && e2.Join {
 				joinArr = append(joinArr, fmt.Sprintf("%s = %s",
 					e2List.FullElementName(e2),
 					t.FullElementName(e),

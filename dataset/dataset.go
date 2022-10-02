@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"github.com/Seann-Moser/QueryHelper/table/dataset_table"
 	"github.com/Seann-Moser/QueryHelper/table/generator"
-	"reflect"
-	"strings"
-
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
+	"reflect"
+	"strings"
 )
 
 type Dataset struct {
@@ -54,7 +53,7 @@ func (d *Dataset) AddTable(s interface{}) error {
 	if err != nil {
 		return err
 	}
-	d.logger.Debug("add_table",
+	d.logger.Info("add_table",
 		zap.String("table", ts.FullTableName()), zap.Int("total_elements", len(ts.GetElements())))
 	d.Tables[getType(s)] = ts
 	if d.createTable {
@@ -64,7 +63,7 @@ func (d *Dataset) AddTable(s interface{}) error {
 }
 func (d *Dataset) CreateTable(t dataset_table.Table) error {
 	sqlStmt := d.generator.MySqlTable(t)
-	_, err := d.DB.ExecContext(d.ctx, sqlStmt)
+	_, err := d.execQuery(d.ctx, sqlStmt)
 	return err
 }
 
@@ -85,7 +84,6 @@ func getType(myvar interface{}) string {
 
 func (d *Dataset) Insert(ctx context.Context, s interface{}) (sql.Result, string, error) {
 	if v, found := d.Tables[getType(s)]; found {
-		d.logger.Debug("insert", zap.String("query", v.InsertStatement()))
 		if v.IsAutoGenerateID() {
 			generateIds := v.GenerateID()
 			args, err := combineStructs(generateIds, s)
@@ -179,7 +177,8 @@ func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, 
 	if v, found := d.Tables[getType(s[0])]; found {
 		var tables []dataset_table.Table
 		for _, t := range s {
-			if v, found := d.Tables[getType(t)]; found {
+			t := getType(t)
+			if v, found := d.Tables[t]; found {
 				tables = append(tables, v)
 			}
 		}
@@ -188,25 +187,22 @@ func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, 
 			return nil, err
 		}
 		query := v.SelectJoin(selectCol, whereStr, tables[1:]...)
-		if d.DB == nil {
-			return nil, err
-		}
 		return d.namedQuery(ctx, query, interface{}(args))
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
 
 func (d *Dataset) execQuery(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	d.logger.Debug("running named query", zap.String("query", query), zap.Any("args", args))
 	if d.dryRun {
-		d.logger.Debug("running named query", zap.String("query", query), zap.Any("args", args))
 		return nil, nil
 	}
 	return d.DB.NamedExecContext(ctx, query, args)
 }
 
 func (d *Dataset) namedQuery(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error) {
+	d.logger.Debug("running named query", zap.String("query", query), zap.Any("args", args))
 	if d.dryRun {
-		d.logger.Debug("running named query", zap.String("query", query), zap.Any("args", args))
 		return nil, nil
 	}
 	return d.DB.NamedQueryContext(ctx, query, interface{}(args))

@@ -9,6 +9,9 @@ func SelectAll[s any](rows *sqlx.Rows, err error) ([]s, error) {
 		return nil, err
 	}
 	var output []s
+	if rows == nil {
+		return output, nil
+	}
 	for rows.Next() {
 		var tmp s
 		err := rows.StructScan(&tmp)

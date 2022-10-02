@@ -12,6 +12,7 @@ type DefaultTable struct {
 	Name     string     `json:"name"`
 	Elements []*Element `json:"elements"`
 }
+
 type Element struct {
 	Name           string
 	Primary        bool `json:"primary"`

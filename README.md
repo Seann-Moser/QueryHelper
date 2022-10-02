@@ -7,14 +7,6 @@
 go get github.com/Seann-Moser/QueryHelper
 ```
 
-## V2
-```go
-import "github.com/Seann-Moser/QueryHelper/v2/table"
-import "github.com/Seann-Moser/QueryHelper/v2/dataset"
-```
-
-
-
 ### Struct Tags
 ```
 db
@@ -24,7 +16,7 @@ q_config
 #### q_config
 #### Bool
 ```
-primary, join, select, update, skip, null
+primary,join,select,update,skip,null, delete, order_acs, auto_generate_id
 ```
 
 or
@@ -35,7 +27,7 @@ primary:true,join:false,select:true, update, skip, null
 
 #### Value
 ```
-where, join_name, data_type, default, where_join, foreign_key, foreign_table
+where,join_name,data_type,default, where_join,foreign_key,foreign_table,order,auto_generate_id_type
 ```
 
 
@@ -45,83 +37,85 @@ where, join_name, data_type, default, where_join, foreign_key, foreign_table
 package main
 
 import (
-	"context"
-	"fmt"
-	"log"
-
-	"github.com/jmoiron/sqlx"
-	"go.uber.org/zap"
-
-	"github.com/Seann-Moser/QueryHelper/v2/dataset"
+    "context"
+    "github.com/Seann-Moser/QueryHelper/dataset"
+    "github.com/Seann-Moser/QueryHelper/table"
+    "go.uber.org/zap"
+    "log"
 )
 
-type Test struct {
-	UserID      string `db:"user_id" q_config:"join,select,join_name:id"`
-	Name        string `db:"name"`
-	UserName    string `db:"user_name"`
-	CreatedDate string `db:"created_date"`
-	Password    string `db:"password"`
-	UpdatedDate string `db:"updated_date"`
-	Active      bool   `db:"active"`
+type User struct {
+    ID               string `db:"id" q_config:"primary,auto_generate_id,auto_generate_id_type:base64,join,join_name:user_id"`
+    UserName         string `db:"user_name" q_config:"where:=,update"`
+    Public           bool   `json:"public" db:"public" q_config:"default:true"`
+    UpdatedTimestamp string `db:"updated_timestamp" json:"updated_timestamp" q_config:"skip,default:updated_timestamp" `
+    CreatedTimestamp string `db:"created_timestamp" json:"created_timestamp" q_config:"skip,default:created_timestamp"`
 }
 
-type Test2 struct {
-	TestID string `db:"test_id" q_config:"join,select,join_name:id"`
-	Name   string `db:"name"`
-	Active bool   `db:"active"`
-}
-
-func main() {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		log.Fatal(err)
-	}
-	//setup db
-
-	db:= sqlx.NewDb(nil,"mysql")
-
-	ds, err := dataset.NewDataset(context.Background(), "test", logger, db, Test{}, Test2{})
-	if err != nil {
-		log.Fatal(err)
-	}
-	rows, err := ds.SelectJoin(context.Background(), []string{"user_name", "name", "test_id"}, nil, Test{}, Test2{})
-	if err != nil {
-		log.Fatal(err)
-	}
-	for rows.next() {
-		var username, name, testId string
-		err = rows.Scan(&username, &name, &testId)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("%s %s %s", username, name, testId)
-	}
-
-}
-```
-
-
-
-
-
-
-Example 
-
-```go
-type Test struct{
-    Name        string `db:"name" default:"jon smith" table:"primary"`
-    UserName    string `db:"user_name" update:"true" null:"true"`
-    CreatedDate string `db:"created_date" default:"NOW()" data_type:"timestamp" table:"skip_insert"`
-}
-func main() {
-    newTable, err := GenerateTableFromStruct("default_db",Test{})
-    if err != nil {
-        log.Fatal(err)
+type UserSettings struct {
+    UserID           string `db:"user_id" q_config:"primary,auto_generate_id,auto_generate_id_type:base64,join,foreign_key:id,foreign_table:User"`
+    Key              string `db:"key" q_config:"where:=,primary"`
+    Value            string `db:"value" q_config:"update"`
+    UpdatedTimestamp string `db:"updated_timestamp" json:"updated_timestamp" q_config:"skip,default:updated_timestamp" `
+    CreatedTimestamp string `db:"created_timestamp" json:"created_timestamp" q_config:"skip,default:created_timestamp"`
     }
-    //err = CreateMySqlTable(ctx,db,newTable) - Will create the table and schema if missing
-    print(newTable.GenerateNamedInsertStatement())
-    // INSERT INTO default_db.Test(name,user_name) VALUES(:name,:user_name);
-    print(newTable.GenerateNamedUpdateStatement())
-    // UPDATE default_db.Test SET user_name = :user_name WHERE name = :name
+
+func main() {
+    logger, err := zap.NewDevelopment()
+    if err != nil {
+        log.Fatal("failed to create logger")
+    }
+    ctx := context.Background()
+    
+    // set sqlx db to enable full functionality
+    ds, err := dataset.New(ctx, "default", true, false, logger, nil, User{}, UserSettings{})
+    if err != nil {
+        logger.Fatal("failed creating dataset")
+    }
+    user := &User{UserName: "test-user"}
+    _, userID, err := ds.Insert(ctx, user)
+    if err != nil {
+		logger.Fatal("failed inserting user")
+    }
+    user.ID = userID
+    logger.Info("created user", zap.String("id", userID))
+    users, err := table.SelectAll[User](ds.Select(ctx, user, "id"))
+    if err != nil {
+        logger.Fatal("failed inserting user")
+    }
+    
+    for _, u := range users {
+        logger.Info("user", zap.String("user_name", u.UserName))
+    }
+    
+    userSetting := &UserSettings{UserID: userID, Key: "k", Value: "v"}
+    _, _, err = ds.Insert(ctx, userSetting)
+    if err != nil {
+        logger.Fatal("failed inserting user")
+    }
+    
+    userSettings, err := table.SelectAll[UserSettings](ds.SelectJoin(ctx, nil, []string{"user_name"}, UserSettings{}, user))
+    if err != nil {
+        logger.Fatal("failed inserting user")
+    }
+    for _, u := range userSettings {
+        logger.Info("user settings", zap.String("key", u.Key), zap.String("key", u.Value))
+    }
+    
+    userSetting.Value = "new"
+    _, err = ds.Update(ctx, userSetting)
+    if err != nil {
+        logger.Fatal("failed inserting user")
+    }
+    
+    _, err = ds.Delete(ctx, userSetting)
+    if err != nil {
+        logger.Fatal("failed inserting user")
+    }
+    
+    _, err = ds.DeleteAllReferences(ctx, user)
+    if err != nil {
+        logger.Fatal("failed inserting user")
+    }
 }
 ```
