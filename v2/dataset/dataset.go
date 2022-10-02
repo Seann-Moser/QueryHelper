@@ -125,25 +125,32 @@ func (d *Dataset) DeleteAllReferences(ctx context.Context, s interface{}) (sql.R
 }
 
 func (d *Dataset) Select(ctx context.Context, s interface{}, whereStmts ...string) (*sqlx.Rows, error) {
+	stmt, err := d.SelectStatement(s, whereStmts...)
+	if err != nil {
+		return nil, err
+	}
+	b, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	t := map[string]interface{}{}
+	err = json.Unmarshal(b, &t)
+	if err != nil {
+		return nil, err
+	}
+
+	d.logger.Debug("select", zap.String("query", stmt))
+	return d.DB.NamedQueryContext(ctx, stmt, t)
+
+}
+
+func (d *Dataset) SelectStatement(s interface{}, whereStmts ...string) (string, error) {
 	if v, found := d.Tables[getType(s)]; found {
 		selectStatement := v.SelectStatement(whereStmts...)
-		b, err := json.Marshal(s)
-		if err != nil {
-			return nil, err
-		}
-		t := map[string]interface{}{}
-		err = json.Unmarshal(b, &t)
-		if err != nil {
-			return nil, err
-		}
 		d.logger.Debug("select", zap.String("query", selectStatement))
-		rows, err := d.DB.NamedQueryContext(ctx, selectStatement, t)
-		if err != nil {
-			return nil, err
-		}
-		return rows, nil
+		return selectStatement, nil
 	}
-	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
+	return "", fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
 
 func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, s ...interface{}) (*sqlx.Rows, error) {

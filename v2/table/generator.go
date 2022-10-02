@@ -93,6 +93,7 @@ func (g *Generator) TableFromStruct(database string, s interface{}) (Tables, err
 		if e.Name == "" {
 			e.Name = structType.Field(i).Name
 		}
+
 		if value := structType.Field(i).Tag.Get("q_config"); value != "" {
 			// q_config:primary,update,select,join,join_name:name,data_type:var(128),skip,default:TIMESTAMP(),null
 			e, err = g.qConfigParser(name, value, structType.Field(i).Type)
@@ -107,6 +108,10 @@ func (g *Generator) TableFromStruct(database string, s interface{}) (Tables, err
 		}
 		if e.Primary {
 			setPrimary = true
+		}
+		if e.Name == "-" {
+			g.logger.Debug("skipping", zap.String("field", structType.Field(i).Name))
+			continue
 		}
 		newTable.Elements = append(newTable.Elements, e)
 	}
