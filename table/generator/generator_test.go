@@ -38,7 +38,7 @@ func TestGenerator_CreateMySqlTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gen := New(logger)
+	gen := New(false, logger)
 	tcs := []*TestCase{
 		{
 			Name:   "GuestRequest",

@@ -83,27 +83,28 @@ func getType(myvar interface{}) string {
 	}
 }
 
-func (d *Dataset) Insert(ctx context.Context, s interface{}) (sql.Result, error) {
+func (d *Dataset) Insert(ctx context.Context, s interface{}) (sql.Result, string, error) {
 	if v, found := d.Tables[getType(s)]; found {
 		d.logger.Debug("insert", zap.String("query", v.InsertStatement()))
 		if v.IsAutoGenerateID() {
 			generateIds := v.GenerateID()
 			args, err := combineStructs(generateIds, s)
 			if err != nil {
-				return nil, err
+				return nil, "", err
 			}
-			return d.DB.NamedExecContext(ctx, v.InsertStatement(), args)
+			results, err := d.execQuery(ctx, v.InsertStatement(), args)
+			return results, generateIds[v.GetGenerateID()[0].Name], nil
 		}
-
-		return d.DB.NamedExecContext(ctx, v.InsertStatement(), s)
+		results, err := d.execQuery(ctx, v.InsertStatement(), s)
+		return results, "", err
 	}
-	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
+	return nil, "", fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
 
 func (d *Dataset) Update(ctx context.Context, s interface{}) (sql.Result, error) {
 	if v, found := d.Tables[getType(s)]; found {
 		d.logger.Debug("update", zap.String("query", v.UpdateStatement()))
-		return d.DB.NamedExecContext(ctx, v.UpdateStatement(), s)
+		return d.execQuery(ctx, v.UpdateStatement(), s)
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
@@ -111,7 +112,7 @@ func (d *Dataset) Update(ctx context.Context, s interface{}) (sql.Result, error)
 func (d *Dataset) Delete(ctx context.Context, s interface{}) (sql.Result, error) {
 	if v, found := d.Tables[getType(s)]; found {
 		d.logger.Debug("delete", zap.String("query", v.DeleteStatement()))
-		return d.DB.NamedExecContext(ctx, v.DeleteStatement(), s)
+		return d.execQuery(ctx, v.DeleteStatement(), s)
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
@@ -119,7 +120,7 @@ func (d *Dataset) Delete(ctx context.Context, s interface{}) (sql.Result, error)
 func (d *Dataset) Count(ctx context.Context, s interface{}, conditional string, whereStmt ...string) (int, error) {
 	if v, found := d.Tables[getType(s)]; found {
 		d.logger.Debug("count", zap.String("query", v.CountStatement(conditional, whereStmt...)))
-		rows, err := d.DB.QueryxContext(ctx, v.CountStatement(conditional, whereStmt...), s)
+		rows, err := d.namedQuery(ctx, v.CountStatement(conditional, whereStmt...), s)
 		if err != nil {
 			return 0, err
 		}
@@ -140,8 +141,8 @@ func (d *Dataset) DeleteAllReferences(ctx context.Context, s interface{}) (sql.R
 	var err error
 	for _, v := range d.Tables {
 		query := v.DeleteStatement()
-		d.logger.Debug("delete", zap.String("query", query))
-		_, e := d.DB.NamedExecContext(ctx, query, s)
+
+		_, e := d.execQuery(ctx, query, s)
 		if err != nil && !strings.Contains(e.Error(), "could not find") {
 			err = multierr.Combine(err, e)
 
@@ -164,16 +165,13 @@ func (d *Dataset) Select(ctx context.Context, s interface{}, whereStmts ...strin
 	if err != nil {
 		return nil, err
 	}
-
-	d.logger.Debug("select", zap.String("query", stmt))
-	return d.DB.NamedQueryContext(ctx, stmt, t)
+	return d.namedQuery(ctx, stmt, t)
 
 }
 
 func (d *Dataset) SelectStatement(s interface{}, whereStmts ...string) (string, error) {
 	if v, found := d.Tables[getType(s)]; found {
 		selectStatement := v.SelectStatement(whereStmts...)
-		d.logger.Debug("select", zap.String("query", selectStatement))
 		return selectStatement, nil
 	}
 	return "", fmt.Errorf("unable to find insert for type: %s", getType(s))
@@ -192,13 +190,28 @@ func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, 
 			return nil, err
 		}
 		query := v.SelectJoin(selectCol, whereStr, tables[1:]...)
-		d.logger.Debug("select_join", zap.String("query", query))
 		if d.DB == nil {
 			return nil, err
 		}
-		return d.DB.NamedQueryContext(ctx, query, interface{}(args))
+		return d.namedQuery(ctx, query, interface{}(args))
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
+}
+
+func (d *Dataset) execQuery(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	if d.dryRun {
+		d.logger.Debug("running named query", zap.String("query", query), zap.Any("args", args))
+		return nil, nil
+	}
+	return d.DB.NamedExecContext(ctx, query, args)
+}
+
+func (d *Dataset) namedQuery(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error) {
+	if d.dryRun {
+		d.logger.Debug("running named query", zap.String("query", query), zap.Any("args", args))
+		return nil, nil
+	}
+	return d.DB.NamedQueryContext(ctx, query, interface{}(args))
 }
 
 func combineStructs(i ...interface{}) (map[string]interface{}, error) {

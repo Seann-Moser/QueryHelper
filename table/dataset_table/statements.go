@@ -18,6 +18,7 @@ type Statements interface {
 	SelectJoin(selectCol, whereElementsStr []string, joinTables ...Tables) string
 	IsAutoGenerateID() bool
 	GenerateID() map[string]string
+	GetGenerateID() []*Element
 }
 
 func (t *Table) IsAutoGenerateID() bool {
@@ -28,29 +29,32 @@ func (t *Table) IsAutoGenerateID() bool {
 	}
 	return false
 }
-
-func (t *Table) GenerateID() map[string]string {
-	m := map[string]string{}
-	if !t.IsAutoGenerateID() {
-		return m
-	}
+func (t *Table) GetGenerateID() []*Element {
+	var output []*Element
 	for _, e := range t.Elements {
 		if e.AutoGenerateID {
-			uid := uuid.New().String()
-			switch e.AutoGenerateIDType {
-			case "hex":
-				hasher := sha1.New()
-				hasher.Write([]byte(uid))
-				m[e.Name] = hex.EncodeToString(hasher.Sum(nil))
-			case "base64":
-				hasher := sha1.New()
-				hasher.Write([]byte(uid))
-				m[e.Name] = base64.URLEncoding.EncodeToString(hasher.Sum(nil))
-			case "uuid":
-				fallthrough
-			default:
-				m[e.Name] = uid
-			}
+			output = append(output, e)
+		}
+	}
+	return output
+}
+func (t *Table) GenerateID() map[string]string {
+	m := map[string]string{}
+	for _, e := range t.GetGenerateID() {
+		uid := uuid.New().String()
+		switch e.AutoGenerateIDType {
+		case "hex":
+			hasher := sha1.New()
+			hasher.Write([]byte(uid))
+			m[e.Name] = hex.EncodeToString(hasher.Sum(nil))
+		case "base64":
+			hasher := sha1.New()
+			hasher.Write([]byte(uid))
+			m[e.Name] = base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+		case "uuid":
+			fallthrough
+		default:
+			m[e.Name] = uid
 		}
 	}
 	return m
