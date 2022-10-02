@@ -52,12 +52,15 @@ func (g *Generator) Table(database string, s interface{}) (dataset_table.Tables,
 			// q_config:primary,update,select,join,join_name:name,data_type:var(128),skip,default:TIMESTAMP(),null
 			e, err = g.qConfigParser(name, value, structType.Field(i).Type)
 			if err != nil {
-				g.logger.Error("failed parsing q_config", zap.String("q_config", value), zap.Error(err))
+				g.logger.Warn("failed parsing q_config", zap.String("q_config", value), zap.Error(err))
 			}
 			e.Name = name
 
 		} else {
 			e, err = g.qConfigParser(name, "", structType.Field(i).Type)
+			if err != nil {
+				g.logger.Warn("failed parsing q_config", zap.String("q_config", value), zap.Error(err))
+			}
 			e.Name = name
 		}
 		if e.Primary {

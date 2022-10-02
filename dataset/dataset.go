@@ -93,7 +93,7 @@ func (d *Dataset) Insert(ctx context.Context, s interface{}) (sql.Result, string
 				return nil, "", err
 			}
 			results, err := d.execQuery(ctx, v.InsertStatement(), args)
-			return results, generateIds[v.GetGenerateID()[0].Name], nil
+			return results, generateIds[v.GetGenerateID()[0].Name], err
 		}
 		results, err := d.execQuery(ctx, v.InsertStatement(), s)
 		return results, "", err
@@ -124,15 +124,13 @@ func (d *Dataset) Count(ctx context.Context, s interface{}, conditional string, 
 		if err != nil {
 			return 0, err
 		}
-		for rows.Next() {
-			var i int
-			err = rows.Scan(&i)
-			if err != nil {
-				return 0, err
-			}
-			return i, nil
+
+		var i int
+		err = rows.Scan(&i)
+		if err != nil {
+			return 0, err
 		}
-		return 0, nil
+		return i, nil
 	}
 	return -1, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
