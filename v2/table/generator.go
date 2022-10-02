@@ -48,7 +48,7 @@ func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*Config, e
 			value = strings.TrimSpace(v[1])
 		}
 		switch strings.ToLower(key) {
-		case "primary", "join", "select", "update", "skip", "null", "delete":
+		case "primary", "join", "select", "update", "skip", "null", "delete", "order_acs":
 			if value != "" {
 				t, err := strconv.ParseBool(value)
 				if err == nil {
@@ -57,7 +57,7 @@ func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*Config, e
 			} else {
 				con[key] = true
 			}
-		case "where", "join_name", "data_type", "default", "where_join", "foreign_key", "foreign_table":
+		case "where", "join_name", "data_type", "default", "where_join", "foreign_key", "foreign_table", "order":
 			if key == "data_type" {
 				con["data_type"] = value
 			}
@@ -76,7 +76,7 @@ func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*Config, e
 	}
 	return config, err
 }
-func (g *Generator) TableFromStruct(database string, s interface{}) (*Table, error) {
+func (g *Generator) TableFromStruct(database string, s interface{}) (Tables, error) {
 	var err error
 	newTable := Table{
 		Dataset:  database,
@@ -121,8 +121,8 @@ func (g *Generator) TableFromStruct(database string, s interface{}) (*Table, err
 	return &newTable, nil
 }
 
-func (g *Generator) CreateMySqlTable(ctx context.Context, t *Table) error {
-	createSchema := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;", t.Dataset)
+func (g *Generator) CreateMySqlTable(ctx context.Context, t Tables) error {
+	createSchema := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;", t.GetDataset())
 	if g.db != nil {
 		_, err := g.db.ExecContext(ctx, createSchema)
 		if err != nil {
@@ -133,11 +133,11 @@ func (g *Generator) CreateMySqlTable(ctx context.Context, t *Table) error {
 	var FK []string
 	var createString string
 	if g.dropTable {
-		createString = fmt.Sprintf("DROP TABLE IF EXISTS %s.%s;\n", t.Dataset, t.Name)
+		createString = fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", t.FullTableName())
 	}
-	createString = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s(", t.Dataset, t.Name)
+	createString = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s(", t.FullTableName())
 
-	for _, element := range t.Elements {
+	for _, element := range t.GetElements() {
 		elementString := fmt.Sprintf("\n\t%s %s", element.Name, element.Type)
 		if !element.Null {
 			elementString += " NOT NULL"
@@ -156,11 +156,11 @@ func (g *Generator) CreateMySqlTable(ctx context.Context, t *Table) error {
 		}
 	}
 	if len(PrimaryKeys) == 0 {
-		createString += fmt.Sprintf("\n\tPRIMARY KEY(%s)", t.Elements[0].Name)
+		createString += fmt.Sprintf("\n\tPRIMARY KEY(%s)", t.GetElements()[0].Name)
 	} else if len(PrimaryKeys) == 1 {
 		createString += fmt.Sprintf("\n\tPRIMARY KEY(%s)", PrimaryKeys[0])
 	} else {
-		createString += fmt.Sprintf("\n\tCONSTRAINT PK_%s_%s PRIMARY KEY (%s)", t.Dataset, t.Name, strings.Join(PrimaryKeys, ","))
+		createString += fmt.Sprintf("\n\tCONSTRAINT PK_%s_%s PRIMARY KEY (%s)", t.GetDataset(), t.GetTableName(), strings.Join(PrimaryKeys, ","))
 
 	}
 	if len(FK) > 0 {

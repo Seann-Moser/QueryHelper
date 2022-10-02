@@ -18,26 +18,26 @@ import (
 type Dataset struct {
 	Name            string
 	structsToTables []interface{}
-	Tables          map[string]*table.Table
+	Tables          map[string]table.Tables
 	ctx             context.Context
 	DB              *sqlx.DB
 	logger          *zap.Logger
 	generator       *table.Generator
 	dryRun          bool
-	createTables    bool
+	createTable     bool
 }
 
 func NewDataset(ctx context.Context, name string, createTable, dropTable bool, logger *zap.Logger, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
 	d := Dataset{
 		Name:            name,
 		structsToTables: structsToTables,
-		Tables:          map[string]*table.Table{},
+		Tables:          map[string]table.Tables{},
 		ctx:             ctx,
 		DB:              db,
 		logger:          logger,
 		generator:       table.NewGenerator(db, dropTable, logger),
 		dryRun:          db == nil,
-		createTables:    createTable,
+		createTable:     createTable,
 	}
 	for _, i := range d.structsToTables {
 		err := d.AddTable(i)
@@ -55,16 +55,15 @@ func (d *Dataset) AddTable(s interface{}) error {
 		return err
 	}
 	d.logger.Debug("add_table",
-		zap.String("table", ts.FullTableName()),
-		zap.Int("total_elements", len(ts.Elements)))
+		zap.String("table", ts.FullTableName()), zap.Int("total_elements", len(ts.GetElements())))
 	d.Tables[getType(s)] = ts
-	if d.createTables {
+	if d.createTable {
 		return d.generator.CreateMySqlTable(d.ctx, ts)
 	}
 	return nil
 }
 
-func (d *Dataset) GetTable(s interface{}) *table.Table {
+func (d *Dataset) GetTable(s interface{}) table.Tables {
 	if v, found := d.Tables[getType(s)]; found {
 		return v
 	}
@@ -105,8 +104,8 @@ func (d *Dataset) Delete(ctx context.Context, s interface{}) (sql.Result, error)
 
 func (d *Dataset) Count(ctx context.Context, s interface{}, conditional string, whereStmt ...string) (sql.Result, error) {
 	if v, found := d.Tables[getType(s)]; found {
-		d.logger.Debug("count", zap.String("query", v.Count(conditional, whereStmt...)))
-		return d.DB.NamedExecContext(ctx, v.Count(conditional, whereStmt...), s)
+		d.logger.Debug("count", zap.String("query", v.CountStatement(conditional, whereStmt...)))
+		return d.DB.NamedExecContext(ctx, v.CountStatement(conditional, whereStmt...), s)
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
@@ -156,7 +155,7 @@ func (d *Dataset) SelectStatement(s interface{}, whereStmts ...string) (string, 
 
 func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, s ...interface{}) (*sqlx.Rows, error) {
 	if v, found := d.Tables[getType(s[0])]; found {
-		var tables []*table.Table
+		var tables []table.Tables
 		for _, t := range s {
 			if v, found := d.Tables[getType(t)]; found {
 				tables = append(tables, v)

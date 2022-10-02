@@ -5,6 +5,15 @@ import (
 	"strings"
 )
 
+type Statements interface {
+	InsertStatement() string
+	SelectStatement(where ...string) string
+	UpdateStatement() string
+	DeleteStatement() string
+	CountStatement(conditional string, whereElementsStr ...string) string
+	SelectJoin(selectCol, whereElementsStr []string, joinTables ...Tables) string
+}
+
 func (t *Table) InsertStatement() string {
 	var columnNames []string
 	var values []string
@@ -70,14 +79,22 @@ func (t *Table) DeleteStatement() string {
 	return fmt.Sprintf("DELETE FROM %s WHERE %s", t.FullTableName(), strings.Join(whereValues, " AND "))
 }
 
-func (t *Table) Count(conditional string, whereElementsStr ...string) string {
+// CountStatement will return a sql statement to find the counts of a table
+func (t *Table) CountStatement(conditional string, whereElementsStr ...string) string {
 	wh := t.WhereStatement(conditional, whereElementsStr...)
 	return fmt.Sprintf("SELECT COUNT(*) as count FROM %s %s", t.FullTableName(), wh)
 }
 
-func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...*Table) string {
-	validTables := []*Table{t}
-	joinStmts := []string{}
+// SelectJoin returns a select join statement to the joinTables
+//
+// It will join tables based off the q_config provided, join, and join_name
+// where statements will be included if they are matched to either of the tables provided including itself
+//
+// selectCol if nil will return all the columns in the current table
+// if not it will return only the selected columns if they are found
+func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...Tables) string {
+	validTables := []Tables{t}
+	var joinStmts []string
 	var whereValues []string
 	for _, i := range whereElementsStr {
 		element := t.FindElementWithName(i)
