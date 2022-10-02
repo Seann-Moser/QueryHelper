@@ -5,29 +5,24 @@ import (
 	"strings"
 )
 
-type Table struct {
-	Dataset  string    `json:"dataset"`
-	Name     string    `json:"name"`
-	Elements []*Config `json:"elements"`
-}
-type Config struct {
-	Name         string
-	Type         string `json:"data_type"`
-	Default      string `json:"default"`
-	Primary      bool   `json:"primary"`
-	ForeignKey   string `json:"foreign_key"`
-	ForeignTable string `json:"foreign_table"`
-	Skip         bool   `json:"skip"`
-	Update       bool   `json:"update"`
-	Null         bool   `json:"null"`
-	Select       bool   `json:"select"`
-	Where        string `json:"where"`
-	WhereJoin    string `json:"where_join"`
-	JoinName     string `json:"join_name"`
-	Join         bool   `json:"join"`
-	Delete       bool   `json:"delete"`
+type Info interface {
+	FullTableName() string
+	GetElements() []*Config
+	GetDataset() string
+	GetTableName() string
+	FullElementName(e *Config) string
+	WhereStatement(conditional string, whereElementsStr ...string) string
+	FindElementWithName(name string) *Config
+	GetSelectableElements(fullNames bool) []string
+	FindCommonElementName(e2List Tables) ([]string, []string)
 }
 
+func (t *Table) GetDataset() string {
+	return t.Dataset
+}
+func (t *Table) GetTableName() string {
+	return t.Dataset
+}
 func (t *Table) SelectableColumns(fullNames bool) string {
 	var data []string
 	for _, v := range t.Elements {
@@ -41,6 +36,9 @@ func (t *Table) SelectableColumns(fullNames bool) string {
 		}
 	}
 	return strings.Join(data, ",")
+}
+func (t *Table) GetElements() []*Config {
+	return t.Elements
 }
 func (t *Table) FullTableName() string {
 	return fmt.Sprintf("%s.%s", t.Dataset, t.Name)
@@ -84,7 +82,7 @@ func (t *Table) FindElementWithName(name string) *Config {
 	return nil
 }
 
-func (t *Table) FindCommonElementName(e2List *Table) ([]string, []string) {
+func (t *Table) FindCommonElementName(e2List Tables) ([]string, []string) {
 	joinArr := []string{}
 	var whereValues []string
 	addedWhereValues := map[string]bool{}
@@ -96,7 +94,7 @@ func (t *Table) FindCommonElementName(e2List *Table) ([]string, []string) {
 		if !e.Join {
 			continue
 		}
-		for _, e2 := range e2List.Elements {
+		for _, e2 := range e2List.GetElements() {
 			if (e2.Name == columnName || e2.JoinName == columnName) && e2.Join {
 				joinArr = append(joinArr, fmt.Sprintf("%s = %s",
 					e2List.FullElementName(e2),
