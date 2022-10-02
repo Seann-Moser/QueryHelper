@@ -15,13 +15,13 @@ type Statements interface {
 	UpdateStatement() string
 	DeleteStatement() string
 	CountStatement(conditional string, whereElementsStr ...string) string
-	SelectJoin(selectCol, whereElementsStr []string, joinTables ...Tables) string
+	SelectJoin(selectCol, whereElementsStr []string, joinTables ...Table) string
 	IsAutoGenerateID() bool
 	GenerateID() map[string]string
 	GetGenerateID() []*Element
 }
 
-func (t *Table) IsAutoGenerateID() bool {
+func (t *DefaultTable) IsAutoGenerateID() bool {
 	for _, e := range t.Elements {
 		if e.AutoGenerateID {
 			return true
@@ -29,7 +29,7 @@ func (t *Table) IsAutoGenerateID() bool {
 	}
 	return false
 }
-func (t *Table) GetGenerateID() []*Element {
+func (t *DefaultTable) GetGenerateID() []*Element {
 	var output []*Element
 	for _, e := range t.Elements {
 		if e.AutoGenerateID {
@@ -38,7 +38,7 @@ func (t *Table) GetGenerateID() []*Element {
 	}
 	return output
 }
-func (t *Table) GenerateID() map[string]string {
+func (t *DefaultTable) GenerateID() map[string]string {
 	m := map[string]string{}
 	for _, e := range t.GetGenerateID() {
 		uid := uuid.New().String()
@@ -59,7 +59,7 @@ func (t *Table) GenerateID() map[string]string {
 	}
 	return m
 }
-func (t *Table) InsertStatement() string {
+func (t *DefaultTable) InsertStatement() string {
 	var columnNames []string
 	var values []string
 	for _, e := range t.Elements {
@@ -78,7 +78,7 @@ func (t *Table) InsertStatement() string {
 		strings.Join(columnNames, ","), strings.Join(values, ","))
 	return insert
 }
-func (t *Table) SelectStatement(where ...string) string {
+func (t *DefaultTable) SelectStatement(where ...string) string {
 	var selectValues = t.GetSelectableElements(false)
 	whereStmt := ""
 	if len(where) > 0 {
@@ -89,7 +89,7 @@ func (t *Table) SelectStatement(where ...string) string {
 	return selectStmt
 }
 
-func (t *Table) UpdateStatement() string {
+func (t *DefaultTable) UpdateStatement() string {
 	var setValues []string
 	var whereValues []string
 	for _, e := range t.Elements {
@@ -110,7 +110,7 @@ func (t *Table) UpdateStatement() string {
 	return update
 }
 
-func (t *Table) DeleteStatement() string {
+func (t *DefaultTable) DeleteStatement() string {
 	var whereValues []string
 	for _, e := range t.Elements {
 		if e.Primary {
@@ -125,7 +125,7 @@ func (t *Table) DeleteStatement() string {
 }
 
 // CountStatement will return a sql statement to find the counts of a table
-func (t *Table) CountStatement(conditional string, whereElementsStr ...string) string {
+func (t *DefaultTable) CountStatement(conditional string, whereElementsStr ...string) string {
 	wh := t.WhereStatement(conditional, whereElementsStr...)
 	return fmt.Sprintf("SELECT COUNT(*) as count FROM %s %s", t.FullTableName(), wh)
 }
@@ -137,8 +137,8 @@ func (t *Table) CountStatement(conditional string, whereElementsStr ...string) s
 //
 // selectCol if nil will return all the columns in the current table
 // if not it will return only the selected columns if they are found
-func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...Tables) string {
-	validTables := []Tables{t}
+func (t *DefaultTable) SelectJoin(selectCol, whereElementsStr []string, joinTables ...Table) string {
+	validTables := []Table{t}
 	var joinStmts []string
 	var whereValues []string
 	for _, i := range whereElementsStr {

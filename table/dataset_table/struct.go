@@ -1,13 +1,13 @@
 package dataset_table
 
-type Tables interface {
+type Table interface {
 	Info
 	Statements
 }
 
-var _ Tables = &Table{}
+var _ Table = &DefaultTable{}
 
-type Table struct {
+type DefaultTable struct {
 	Dataset  string     `json:"dataset"`
 	Name     string     `json:"name"`
 	Elements []*Element `json:"elements"`

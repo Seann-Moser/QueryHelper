@@ -14,16 +14,16 @@ type Info interface {
 	WhereStatement(conditional string, whereElementsStr ...string) string
 	FindElementWithName(name string) *Element
 	GetSelectableElements(fullNames bool) []string
-	FindCommonElementName(e2List Tables) ([]string, []string)
+	FindCommonElementName(e2List Table) ([]string, []string)
 }
 
-func (t *Table) GetDataset() string {
+func (t *DefaultTable) GetDataset() string {
 	return t.Dataset
 }
-func (t *Table) GetTableName() string {
+func (t *DefaultTable) GetTableName() string {
 	return t.Dataset
 }
-func (t *Table) SelectableColumns(fullNames bool) string {
+func (t *DefaultTable) SelectableColumns(fullNames bool) string {
 	var data []string
 	for _, v := range t.Elements {
 		if !(v.Select || v.Primary) {
@@ -37,18 +37,18 @@ func (t *Table) SelectableColumns(fullNames bool) string {
 	}
 	return strings.Join(data, ",")
 }
-func (t *Table) GetElements() []*Element {
+func (t *DefaultTable) GetElements() []*Element {
 	return t.Elements
 }
-func (t *Table) FullTableName() string {
+func (t *DefaultTable) FullTableName() string {
 	return fmt.Sprintf("%s.%s", t.Dataset, t.Name)
 }
 
-func (t *Table) FullElementName(e *Element) string {
+func (t *DefaultTable) FullElementName(e *Element) string {
 	return fmt.Sprintf("%s.%s", t.Name, e.Name)
 }
 
-func (t *Table) WhereStatement(conditional string, whereElementsStr ...string) string {
+func (t *DefaultTable) WhereStatement(conditional string, whereElementsStr ...string) string {
 	var whereValues []string
 	for _, i := range whereElementsStr {
 		element := t.FindElementWithName(i)
@@ -73,7 +73,7 @@ func (t *Table) WhereStatement(conditional string, whereElementsStr ...string) s
 
 }
 
-func (t *Table) FindElementWithName(name string) *Element {
+func (t *DefaultTable) FindElementWithName(name string) *Element {
 	for _, e := range t.Elements {
 		if strings.EqualFold(e.Name, name) {
 			return e
@@ -82,7 +82,7 @@ func (t *Table) FindElementWithName(name string) *Element {
 	return nil
 }
 
-func (t *Table) FindCommonElementName(e2List Tables) ([]string, []string) {
+func (t *DefaultTable) FindCommonElementName(e2List Table) ([]string, []string) {
 	joinArr := []string{}
 	var whereValues []string
 	addedWhereValues := map[string]bool{}
@@ -111,7 +111,7 @@ func (t *Table) FindCommonElementName(e2List Tables) ([]string, []string) {
 	return joinArr, whereValues
 }
 
-func (t *Table) GetSelectableElements(fullNames bool) []string {
+func (t *DefaultTable) GetSelectableElements(fullNames bool) []string {
 	var selectValues []string
 	for _, e := range t.Elements {
 		if e.Select {

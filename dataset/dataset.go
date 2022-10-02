@@ -18,7 +18,7 @@ import (
 type Dataset struct {
 	Name            string
 	structsToTables []interface{}
-	Tables          map[string]dataset_table.Tables
+	Tables          map[string]dataset_table.Table
 	ctx             context.Context
 	DB              *sqlx.DB
 	logger          *zap.Logger
@@ -31,7 +31,7 @@ func New(ctx context.Context, name string, createTable, dropTable bool, logger *
 	d := Dataset{
 		Name:            name,
 		structsToTables: structsToTables,
-		Tables:          map[string]dataset_table.Tables{},
+		Tables:          map[string]dataset_table.Table{},
 		ctx:             ctx,
 		DB:              db,
 		logger:          logger,
@@ -62,13 +62,13 @@ func (d *Dataset) AddTable(s interface{}) error {
 	}
 	return nil
 }
-func (d *Dataset) CreateTable(t dataset_table.Tables) error {
+func (d *Dataset) CreateTable(t dataset_table.Table) error {
 	sqlStmt := d.generator.MySqlTable(t)
 	_, err := d.DB.ExecContext(d.ctx, sqlStmt)
 	return err
 }
 
-func (d *Dataset) GetTable(s interface{}) dataset_table.Tables {
+func (d *Dataset) GetTable(s interface{}) dataset_table.Table {
 	if v, found := d.Tables[getType(s)]; found {
 		return v
 	}
@@ -177,7 +177,7 @@ func (d *Dataset) SelectStatement(s interface{}, whereStmts ...string) (string, 
 
 func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, s ...interface{}) (*sqlx.Rows, error) {
 	if v, found := d.Tables[getType(s[0])]; found {
-		var tables []dataset_table.Tables
+		var tables []dataset_table.Table
 		for _, t := range s {
 			if v, found := d.Tables[getType(t)]; found {
 				tables = append(tables, v)

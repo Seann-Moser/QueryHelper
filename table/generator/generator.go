@@ -30,9 +30,9 @@ const (
 	TableTime        = "timestamp"
 )
 
-func (g *Generator) Table(database string, s interface{}) (dataset_table.Tables, error) {
+func (g *Generator) Table(database string, s interface{}) (dataset_table.Table, error) {
 	var err error
-	newTable := dataset_table.Table{
+	newTable := dataset_table.DefaultTable{
 		Dataset:  database,
 		Name:     getType(s),
 		Elements: []*dataset_table.Element{},
@@ -78,7 +78,7 @@ func (g *Generator) Table(database string, s interface{}) (dataset_table.Tables,
 	return &newTable, nil
 }
 
-func (g *Generator) MySqlTable(t dataset_table.Tables) string {
+func (g *Generator) MySqlTable(t dataset_table.Table) string {
 	createStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;\n", t.GetDataset())
 	var PrimaryKeys []string
 	var FK []string
