@@ -1,4 +1,4 @@
-package table
+package dataset_table
 
 import (
 	"fmt"

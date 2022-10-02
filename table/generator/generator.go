@@ -1,11 +1,10 @@
-package table
+package generator
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/Seann-Moser/QueryHelper/table/dataset_table"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -18,7 +17,7 @@ type Generator struct {
 	dropTable bool
 }
 
-func NewGenerator(db *sqlx.DB, dropTable bool, logger *zap.Logger) *Generator {
+func New(db *sqlx.DB, dropTable bool, logger *zap.Logger) *Generator {
 	return &Generator{
 		db:        db,
 		logger:    logger,
@@ -35,59 +34,18 @@ const (
 	TableTime        = "timestamp"
 )
 
-func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*Config, error) {
-	dataPoints := strings.Split(data, ",")
-	con := map[string]interface{}{}
-	con["select"] = true
-	con["data_type"] = convertTypeToSql(name, p)
-	for _, row := range dataPoints {
-		v := strings.Split(row, ":")
-		key := strings.TrimSpace(v[0])
-		value := ""
-		if len(v) > 1 {
-			value = strings.TrimSpace(v[1])
-		}
-		switch strings.ToLower(key) {
-		case "primary", "join", "select", "update", "skip", "null", "delete", "order_acs":
-			if value != "" {
-				t, err := strconv.ParseBool(value)
-				if err == nil {
-					con[key] = t
-				}
-			} else {
-				con[key] = true
-			}
-		case "where", "join_name", "data_type", "default", "where_join", "foreign_key", "foreign_table", "order":
-			if key == "data_type" {
-				con["data_type"] = value
-			}
-			con[key] = strings.ReplaceAll(value, "{{comma}}", ",")
-		}
-
-	}
-	b, err := json.Marshal(con)
-	if err != nil {
-		return nil, err
-	}
-	config := &Config{}
-	err = json.Unmarshal(b, config)
-	if err != nil {
-		return nil, err
-	}
-	return config, err
-}
-func (g *Generator) TableFromStruct(database string, s interface{}) (Tables, error) {
+func (g *Generator) Table(database string, s interface{}) (dataset_table.Tables, error) {
 	var err error
-	newTable := Table{
+	newTable := dataset_table.Table{
 		Dataset:  database,
 		Name:     getType(s),
-		Elements: []*Config{},
+		Elements: []*dataset_table.Config{},
 	}
 
 	structType := reflect.TypeOf(s)
 	var setPrimary bool
 	for i := 0; i < structType.NumField(); i++ {
-		e := &Config{Select: true, Primary: false}
+		e := &dataset_table.Config{Select: true, Primary: false}
 		name := structType.Field(i).Tag.Get("db")
 		e.Name = name
 		if e.Name == "" {
@@ -121,7 +79,7 @@ func (g *Generator) TableFromStruct(database string, s interface{}) (Tables, err
 	return &newTable, nil
 }
 
-func (g *Generator) CreateMySqlTable(ctx context.Context, t Tables) error {
+func (g *Generator) MySqlTable(ctx context.Context, t dataset_table.Tables) error {
 	createSchema := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;", t.GetDataset())
 	if g.db != nil {
 		_, err := g.db.ExecContext(ctx, createSchema)
@@ -135,7 +93,7 @@ func (g *Generator) CreateMySqlTable(ctx context.Context, t Tables) error {
 	if g.dropTable {
 		createString = fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", t.FullTableName())
 	}
-	createString = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s(", t.FullTableName())
+	createString += fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s(", t.FullTableName())
 
 	for _, element := range t.GetElements() {
 		elementString := fmt.Sprintf("\n\t%s %s", element.Name, element.Type)
@@ -182,26 +140,5 @@ func getType(myvar interface{}) string {
 		return t.Elem().Name()
 	} else {
 		return t.Name()
-	}
-}
-
-func convertTypeToSql(name string, v reflect.Type) string {
-	switch v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return TableTypeInt
-	case reflect.String:
-		return TableTypeVarChar
-	case reflect.Float32, reflect.Float64:
-		return TableTypeFloat
-	case reflect.Bool:
-		return TableTypeBool
-	default:
-		if strings.Contains(name, "timestamp") {
-			return "TIMESTAMP"
-		}
-		if strings.Contains(name, "date") {
-			return "DATE"
-		}
-		return TableTypeText
 	}
 }
