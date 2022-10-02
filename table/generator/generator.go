@@ -1,25 +1,21 @@
 package generator
 
 import (
-	"context"
 	"fmt"
 	"github.com/Seann-Moser/QueryHelper/table/dataset_table"
 	"reflect"
 	"strings"
 
-	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 )
 
 type Generator struct {
-	db        *sqlx.DB
 	logger    *zap.Logger
 	dropTable bool
 }
 
-func New(db *sqlx.DB, dropTable bool, logger *zap.Logger) *Generator {
+func New(dropTable bool, logger *zap.Logger) *Generator {
 	return &Generator{
-		db:        db,
 		logger:    logger,
 		dropTable: dropTable,
 	}
@@ -39,13 +35,13 @@ func (g *Generator) Table(database string, s interface{}) (dataset_table.Tables,
 	newTable := dataset_table.Table{
 		Dataset:  database,
 		Name:     getType(s),
-		Elements: []*dataset_table.Config{},
+		Elements: []*dataset_table.Element{},
 	}
 
 	structType := reflect.TypeOf(s)
 	var setPrimary bool
 	for i := 0; i < structType.NumField(); i++ {
-		e := &dataset_table.Config{Select: true, Primary: false}
+		e := &dataset_table.Element{Select: true, Primary: false}
 		name := structType.Field(i).Tag.Get("db")
 		e.Name = name
 		if e.Name == "" {
@@ -79,33 +75,33 @@ func (g *Generator) Table(database string, s interface{}) (dataset_table.Tables,
 	return &newTable, nil
 }
 
-func (g *Generator) MySqlTable(ctx context.Context, t dataset_table.Tables) error {
-	createSchema := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;", t.GetDataset())
-	if g.db != nil {
-		_, err := g.db.ExecContext(ctx, createSchema)
-		if err != nil {
-			return fmt.Errorf("err: %v, schema: %s", err, createSchema)
-		}
-	}
+func (g *Generator) MySqlTable(t dataset_table.Tables) string {
+	createStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;\n", t.GetDataset())
 	var PrimaryKeys []string
 	var FK []string
-	var createString string
 	if g.dropTable {
-		createString = fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", t.FullTableName())
+		createStatement += fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", t.FullTableName())
 	}
-	createString += fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s(", t.FullTableName())
+	createStatement += fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s(", t.FullTableName())
 
 	for _, element := range t.GetElements() {
 		elementString := fmt.Sprintf("\n\t%s %s", element.Name, element.Type)
 		if !element.Null {
 			elementString += " NOT NULL"
 		}
-		if element.Default != "" {
+		switch element.Default {
+		case "created_timestamp":
+			elementString += " DEFAULT NOW()"
+		case "updated_timestamp":
+			elementString += " DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+		case "":
+			if element.Null {
+				elementString += " DEFAULT NULL"
+			}
+		default:
 			elementString += fmt.Sprintf(" DEFAULT %s", element.Default)
-		} else if element.Default == "" && element.Null {
-			elementString += " DEFAULT NULL"
 		}
-		createString += elementString + ","
+		createStatement += elementString + ","
 		if element.Primary {
 			PrimaryKeys = append(PrimaryKeys, element.Name)
 		}
@@ -114,25 +110,18 @@ func (g *Generator) MySqlTable(ctx context.Context, t dataset_table.Tables) erro
 		}
 	}
 	if len(PrimaryKeys) == 0 {
-		createString += fmt.Sprintf("\n\tPRIMARY KEY(%s)", t.GetElements()[0].Name)
+		createStatement += fmt.Sprintf("\n\tPRIMARY KEY(%s)", t.GetElements()[0].Name)
 	} else if len(PrimaryKeys) == 1 {
-		createString += fmt.Sprintf("\n\tPRIMARY KEY(%s)", PrimaryKeys[0])
+		createStatement += fmt.Sprintf("\n\tPRIMARY KEY(%s)", PrimaryKeys[0])
 	} else {
-		createString += fmt.Sprintf("\n\tCONSTRAINT PK_%s_%s PRIMARY KEY (%s)", t.GetDataset(), t.GetTableName(), strings.Join(PrimaryKeys, ","))
+		createStatement += fmt.Sprintf("\n\tCONSTRAINT PK_%s_%s PRIMARY KEY (%s)", t.GetDataset(), t.GetTableName(), strings.Join(PrimaryKeys, ","))
 
 	}
 	if len(FK) > 0 {
-		createString += "," + strings.Join(FK, ",")
+		createStatement += "," + strings.Join(FK, ",")
 	}
-	createString += "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8;"
-	g.logger.Debug("creating table", zap.String("create_table", createString))
-	if g.db != nil {
-		_, err := g.db.ExecContext(ctx, createString)
-		if err != nil {
-			return fmt.Errorf("err: %v, table: %s", err, createString)
-		}
-	}
-	return nil
+	createStatement += "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8;"
+	return createStatement
 }
 
 func getType(myvar interface{}) string {

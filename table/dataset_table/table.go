@@ -7,12 +7,12 @@ import (
 
 type Info interface {
 	FullTableName() string
-	GetElements() []*Config
+	GetElements() []*Element
 	GetDataset() string
 	GetTableName() string
-	FullElementName(e *Config) string
+	FullElementName(e *Element) string
 	WhereStatement(conditional string, whereElementsStr ...string) string
-	FindElementWithName(name string) *Config
+	FindElementWithName(name string) *Element
 	GetSelectableElements(fullNames bool) []string
 	FindCommonElementName(e2List Tables) ([]string, []string)
 }
@@ -37,14 +37,14 @@ func (t *Table) SelectableColumns(fullNames bool) string {
 	}
 	return strings.Join(data, ",")
 }
-func (t *Table) GetElements() []*Config {
+func (t *Table) GetElements() []*Element {
 	return t.Elements
 }
 func (t *Table) FullTableName() string {
 	return fmt.Sprintf("%s.%s", t.Dataset, t.Name)
 }
 
-func (t *Table) FullElementName(e *Config) string {
+func (t *Table) FullElementName(e *Element) string {
 	return fmt.Sprintf("%s.%s", t.Name, e.Name)
 }
 
@@ -73,7 +73,7 @@ func (t *Table) WhereStatement(conditional string, whereElementsStr ...string) s
 
 }
 
-func (t *Table) FindElementWithName(name string) *Config {
+func (t *Table) FindElementWithName(name string) *Element {
 	for _, e := range t.Elements {
 		if strings.EqualFold(e.Name, name) {
 			return e

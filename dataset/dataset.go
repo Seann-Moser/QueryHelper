@@ -35,7 +35,7 @@ func New(ctx context.Context, name string, createTable, dropTable bool, logger *
 		ctx:             ctx,
 		DB:              db,
 		logger:          logger,
-		generator:       generator.New(db, dropTable, logger),
+		generator:       generator.New(dropTable, logger),
 		dryRun:          db == nil,
 		createTable:     createTable,
 	}
@@ -58,9 +58,14 @@ func (d *Dataset) AddTable(s interface{}) error {
 		zap.String("table", ts.FullTableName()), zap.Int("total_elements", len(ts.GetElements())))
 	d.Tables[getType(s)] = ts
 	if d.createTable {
-		return d.generator.MySqlTable(d.ctx, ts)
+		return d.CreateTable(ts)
 	}
 	return nil
+}
+func (d *Dataset) CreateTable(t dataset_table.Tables) error {
+	sqlStmt := d.generator.MySqlTable(t)
+	_, err := d.DB.ExecContext(d.ctx, sqlStmt)
+	return err
 }
 
 func (d *Dataset) GetTable(s interface{}) dataset_table.Tables {
@@ -81,6 +86,15 @@ func getType(myvar interface{}) string {
 func (d *Dataset) Insert(ctx context.Context, s interface{}) (sql.Result, error) {
 	if v, found := d.Tables[getType(s)]; found {
 		d.logger.Debug("insert", zap.String("query", v.InsertStatement()))
+		if v.IsAutoGenerateID() {
+			generateIds := v.GenerateID()
+			args, err := combineStructs(generateIds, s)
+			if err != nil {
+				return nil, err
+			}
+			return d.DB.NamedExecContext(ctx, v.InsertStatement(), args)
+		}
+
 		return d.DB.NamedExecContext(ctx, v.InsertStatement(), s)
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))

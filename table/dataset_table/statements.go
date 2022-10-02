@@ -1,7 +1,11 @@
 package dataset_table
 
 import (
+	"crypto/sha1"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"github.com/google/uuid"
 	"strings"
 )
 
@@ -12,8 +16,45 @@ type Statements interface {
 	DeleteStatement() string
 	CountStatement(conditional string, whereElementsStr ...string) string
 	SelectJoin(selectCol, whereElementsStr []string, joinTables ...Tables) string
+	IsAutoGenerateID() bool
+	GenerateID() map[string]string
 }
 
+func (t *Table) IsAutoGenerateID() bool {
+	for _, e := range t.Elements {
+		if e.AutoGenerateID {
+			return true
+		}
+	}
+	return false
+}
+
+func (t *Table) GenerateID() map[string]string {
+	m := map[string]string{}
+	if !t.IsAutoGenerateID() {
+		return m
+	}
+	for _, e := range t.Elements {
+		if e.AutoGenerateID {
+			uid := uuid.New().String()
+			switch e.AutoGenerateIDType {
+			case "hex":
+				hasher := sha1.New()
+				hasher.Write([]byte(uid))
+				m[e.Name] = hex.EncodeToString(hasher.Sum(nil))
+			case "base64":
+				hasher := sha1.New()
+				hasher.Write([]byte(uid))
+				m[e.Name] = base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+			case "uuid":
+				fallthrough
+			default:
+				m[e.Name] = uid
+			}
+		}
+	}
+	return m
+}
 func (t *Table) InsertStatement() string {
 	var columnNames []string
 	var values []string
