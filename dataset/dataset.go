@@ -5,37 +5,36 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"reflect"
-	"strings"
-
+	"github.com/Seann-Moser/QueryHelper/table/dataset_table"
+	"github.com/Seann-Moser/QueryHelper/table/generator"
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
-
-	"github.com/Seann-Moser/QueryHelper/v2/table"
+	"reflect"
+	"strings"
 )
 
 type Dataset struct {
 	Name            string
 	structsToTables []interface{}
-	Tables          map[string]table.Tables
+	Tables          map[string]dataset_table.Table
 	ctx             context.Context
 	DB              *sqlx.DB
 	logger          *zap.Logger
-	generator       *table.Generator
+	generator       *generator.Generator
 	dryRun          bool
 	createTable     bool
 }
 
-func NewDataset(ctx context.Context, name string, createTable, dropTable bool, logger *zap.Logger, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
+func New(ctx context.Context, name string, createTable, dropTable bool, logger *zap.Logger, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
 	d := Dataset{
 		Name:            name,
 		structsToTables: structsToTables,
-		Tables:          map[string]table.Tables{},
+		Tables:          map[string]dataset_table.Table{},
 		ctx:             ctx,
 		DB:              db,
 		logger:          logger,
-		generator:       table.NewGenerator(db, dropTable, logger),
+		generator:       generator.New(dropTable, logger),
 		dryRun:          db == nil,
 		createTable:     createTable,
 	}
@@ -50,20 +49,25 @@ func NewDataset(ctx context.Context, name string, createTable, dropTable bool, l
 }
 
 func (d *Dataset) AddTable(s interface{}) error {
-	ts, err := d.generator.TableFromStruct(d.Name, s)
+	ts, err := d.generator.Table(d.Name, s)
 	if err != nil {
 		return err
 	}
-	d.logger.Debug("add_table",
+	d.logger.Info("add_table",
 		zap.String("table", ts.FullTableName()), zap.Int("total_elements", len(ts.GetElements())))
 	d.Tables[getType(s)] = ts
 	if d.createTable {
-		return d.generator.CreateMySqlTable(d.ctx, ts)
+		return d.CreateTable(ts)
 	}
 	return nil
 }
+func (d *Dataset) CreateTable(t dataset_table.Table) error {
+	sqlStmt := d.generator.MySqlTable(t)
+	_, err := d.execQuery(d.ctx, sqlStmt)
+	return err
+}
 
-func (d *Dataset) GetTable(s interface{}) table.Tables {
+func (d *Dataset) GetTable(s interface{}) dataset_table.Table {
 	if v, found := d.Tables[getType(s)]; found {
 		return v
 	}
@@ -78,18 +82,27 @@ func getType(myvar interface{}) string {
 	}
 }
 
-func (d *Dataset) Insert(ctx context.Context, s interface{}) (sql.Result, error) {
+func (d *Dataset) Insert(ctx context.Context, s interface{}) (sql.Result, string, error) {
 	if v, found := d.Tables[getType(s)]; found {
-		d.logger.Debug("insert", zap.String("query", v.InsertStatement()))
-		return d.DB.NamedExecContext(ctx, v.InsertStatement(), s)
+		if v.IsAutoGenerateID() {
+			generateIds := v.GenerateID()
+			args, err := combineStructs(generateIds, s)
+			if err != nil {
+				return nil, "", err
+			}
+			results, err := d.execQuery(ctx, v.InsertStatement(), args)
+			return results, generateIds[v.GetGenerateID()[0].Name], err
+		}
+		results, err := d.execQuery(ctx, v.InsertStatement(), s)
+		return results, "", err
 	}
-	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
+	return nil, "", fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
 
 func (d *Dataset) Update(ctx context.Context, s interface{}) (sql.Result, error) {
 	if v, found := d.Tables[getType(s)]; found {
 		d.logger.Debug("update", zap.String("query", v.UpdateStatement()))
-		return d.DB.NamedExecContext(ctx, v.UpdateStatement(), s)
+		return d.execQuery(ctx, v.UpdateStatement(), s)
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
@@ -97,25 +110,35 @@ func (d *Dataset) Update(ctx context.Context, s interface{}) (sql.Result, error)
 func (d *Dataset) Delete(ctx context.Context, s interface{}) (sql.Result, error) {
 	if v, found := d.Tables[getType(s)]; found {
 		d.logger.Debug("delete", zap.String("query", v.DeleteStatement()))
-		return d.DB.NamedExecContext(ctx, v.DeleteStatement(), s)
+		return d.execQuery(ctx, v.DeleteStatement(), s)
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
 
-func (d *Dataset) Count(ctx context.Context, s interface{}, conditional string, whereStmt ...string) (sql.Result, error) {
+func (d *Dataset) Count(ctx context.Context, s interface{}, conditional string, whereStmt ...string) (int, error) {
 	if v, found := d.Tables[getType(s)]; found {
 		d.logger.Debug("count", zap.String("query", v.CountStatement(conditional, whereStmt...)))
-		return d.DB.NamedExecContext(ctx, v.CountStatement(conditional, whereStmt...), s)
+		rows, err := d.namedQuery(ctx, v.CountStatement(conditional, whereStmt...), s)
+		if err != nil {
+			return 0, err
+		}
+
+		var i int
+		err = rows.Scan(&i)
+		if err != nil {
+			return 0, err
+		}
+		return i, nil
 	}
-	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
+	return -1, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
 
 func (d *Dataset) DeleteAllReferences(ctx context.Context, s interface{}) (sql.Result, error) {
 	var err error
 	for _, v := range d.Tables {
 		query := v.DeleteStatement()
-		d.logger.Debug("delete", zap.String("query", query))
-		_, e := d.DB.NamedExecContext(ctx, query, s)
+
+		_, e := d.execQuery(ctx, query, s)
 		if err != nil && !strings.Contains(e.Error(), "could not find") {
 			err = multierr.Combine(err, e)
 
@@ -138,16 +161,13 @@ func (d *Dataset) Select(ctx context.Context, s interface{}, whereStmts ...strin
 	if err != nil {
 		return nil, err
 	}
-
-	d.logger.Debug("select", zap.String("query", stmt))
-	return d.DB.NamedQueryContext(ctx, stmt, t)
+	return d.namedQuery(ctx, stmt, t)
 
 }
 
 func (d *Dataset) SelectStatement(s interface{}, whereStmts ...string) (string, error) {
 	if v, found := d.Tables[getType(s)]; found {
 		selectStatement := v.SelectStatement(whereStmts...)
-		d.logger.Debug("select", zap.String("query", selectStatement))
 		return selectStatement, nil
 	}
 	return "", fmt.Errorf("unable to find insert for type: %s", getType(s))
@@ -155,9 +175,10 @@ func (d *Dataset) SelectStatement(s interface{}, whereStmts ...string) (string, 
 
 func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, s ...interface{}) (*sqlx.Rows, error) {
 	if v, found := d.Tables[getType(s[0])]; found {
-		var tables []table.Tables
+		var tables []dataset_table.Table
 		for _, t := range s {
-			if v, found := d.Tables[getType(t)]; found {
+			t := getType(t)
+			if v, found := d.Tables[t]; found {
 				tables = append(tables, v)
 			}
 		}
@@ -166,13 +187,25 @@ func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, 
 			return nil, err
 		}
 		query := v.SelectJoin(selectCol, whereStr, tables[1:]...)
-		d.logger.Debug("select_join", zap.String("query", query))
-		if d.DB == nil {
-			return nil, err
-		}
-		return d.DB.NamedQueryContext(ctx, query, interface{}(args))
+		return d.namedQuery(ctx, query, interface{}(args))
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
+}
+
+func (d *Dataset) execQuery(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	d.logger.Debug("running named query", zap.String("query", query), zap.Any("args", args))
+	if d.dryRun {
+		return nil, nil
+	}
+	return d.DB.NamedExecContext(ctx, query, args)
+}
+
+func (d *Dataset) namedQuery(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error) {
+	d.logger.Debug("running named query", zap.String("query", query), zap.Any("args", args))
+	if d.dryRun {
+		return nil, nil
+	}
+	return d.DB.NamedQueryContext(ctx, query, interface{}(args))
 }
 
 func combineStructs(i ...interface{}) (map[string]interface{}, error) {

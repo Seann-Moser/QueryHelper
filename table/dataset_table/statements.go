@@ -1,7 +1,11 @@
-package table
+package dataset_table
 
 import (
+	"crypto/sha1"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"github.com/google/uuid"
 	"strings"
 )
 
@@ -11,10 +15,51 @@ type Statements interface {
 	UpdateStatement() string
 	DeleteStatement() string
 	CountStatement(conditional string, whereElementsStr ...string) string
-	SelectJoin(selectCol, whereElementsStr []string, joinTables ...Tables) string
+	SelectJoin(selectCol, whereElementsStr []string, joinTables ...Table) string
+	IsAutoGenerateID() bool
+	GenerateID() map[string]string
+	GetGenerateID() []*Element
 }
 
-func (t *Table) InsertStatement() string {
+func (t *DefaultTable) IsAutoGenerateID() bool {
+	for _, e := range t.Elements {
+		if e.AutoGenerateID {
+			return true
+		}
+	}
+	return false
+}
+func (t *DefaultTable) GetGenerateID() []*Element {
+	var output []*Element
+	for _, e := range t.Elements {
+		if e.AutoGenerateID {
+			output = append(output, e)
+		}
+	}
+	return output
+}
+func (t *DefaultTable) GenerateID() map[string]string {
+	m := map[string]string{}
+	for _, e := range t.GetGenerateID() {
+		uid := uuid.New().String()
+		switch e.AutoGenerateIDType {
+		case "hex":
+			hasher := sha1.New()
+			hasher.Write([]byte(uid))
+			m[e.Name] = hex.EncodeToString(hasher.Sum(nil))
+		case "base64":
+			hasher := sha1.New()
+			hasher.Write([]byte(uid))
+			m[e.Name] = base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+		case "uuid":
+			fallthrough
+		default:
+			m[e.Name] = uid
+		}
+	}
+	return m
+}
+func (t *DefaultTable) InsertStatement() string {
 	var columnNames []string
 	var values []string
 	for _, e := range t.Elements {
@@ -33,7 +78,7 @@ func (t *Table) InsertStatement() string {
 		strings.Join(columnNames, ","), strings.Join(values, ","))
 	return insert
 }
-func (t *Table) SelectStatement(where ...string) string {
+func (t *DefaultTable) SelectStatement(where ...string) string {
 	var selectValues = t.GetSelectableElements(false)
 	whereStmt := ""
 	if len(where) > 0 {
@@ -44,7 +89,7 @@ func (t *Table) SelectStatement(where ...string) string {
 	return selectStmt
 }
 
-func (t *Table) UpdateStatement() string {
+func (t *DefaultTable) UpdateStatement() string {
 	var setValues []string
 	var whereValues []string
 	for _, e := range t.Elements {
@@ -65,7 +110,7 @@ func (t *Table) UpdateStatement() string {
 	return update
 }
 
-func (t *Table) DeleteStatement() string {
+func (t *DefaultTable) DeleteStatement() string {
 	var whereValues []string
 	for _, e := range t.Elements {
 		if e.Primary {
@@ -80,7 +125,7 @@ func (t *Table) DeleteStatement() string {
 }
 
 // CountStatement will return a sql statement to find the counts of a table
-func (t *Table) CountStatement(conditional string, whereElementsStr ...string) string {
+func (t *DefaultTable) CountStatement(conditional string, whereElementsStr ...string) string {
 	wh := t.WhereStatement(conditional, whereElementsStr...)
 	return fmt.Sprintf("SELECT COUNT(*) as count FROM %s %s", t.FullTableName(), wh)
 }
@@ -92,8 +137,8 @@ func (t *Table) CountStatement(conditional string, whereElementsStr ...string) s
 //
 // selectCol if nil will return all the columns in the current table
 // if not it will return only the selected columns if they are found
-func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...Tables) string {
-	validTables := []Tables{t}
+func (t *DefaultTable) SelectJoin(selectCol, whereElementsStr []string, joinTables ...Table) string {
+	validTables := []Table{t}
 	var joinStmts []string
 	var whereValues []string
 	for _, i := range whereElementsStr {
@@ -114,7 +159,7 @@ func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...T
 		if len(commonElements) == 0 {
 			continue
 		}
-		if whereElementsStr == nil || len(whereElementsStr) == 0 {
+		if len(whereElementsStr) == 0 {
 			whereValues = append(whereValues, wv...)
 		} else {
 			for _, i := range whereElementsStr {
@@ -137,10 +182,9 @@ func (t *Table) SelectJoin(selectCol, whereElementsStr []string, joinTables ...T
 	}
 
 	var selectValues []string
-	var dedupMap map[string]bool
-	dedupMap = map[string]bool{}
+	dedupMap := map[string]bool{}
 	for _, validTable := range validTables {
-		if (selectCol == nil || len(selectCol) == 0) && len(selectValues) == 0 {
+		if (len(selectCol) == 0) && len(selectValues) == 0 {
 			selectValues = append(selectValues, validTable.GetSelectableElements(true)...)
 		} else {
 			for _, e := range validTable.GetSelectableElements(true) {

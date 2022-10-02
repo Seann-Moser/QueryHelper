@@ -4,18 +4,21 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func SelectAll[s any](rows *sqlx.Rows, err error) ([]*s, error) {
+func SelectAll[s any](rows *sqlx.Rows, err error) ([]s, error) {
 	if err != nil {
 		return nil, err
 	}
-	var output []*s
+	var output []s
+	if rows == nil {
+		return output, nil
+	}
 	for rows.Next() {
 		var tmp s
 		err := rows.StructScan(&tmp)
 		if err != nil {
 			return nil, err
 		}
-		output = append(output, &tmp)
+		output = append(output, tmp)
 	}
 	return output, nil
 }
