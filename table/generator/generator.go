@@ -78,10 +78,11 @@ func (g *Generator) Table(database string, s interface{}) (dataset_table.Table, 
 	return &newTable, nil
 }
 
-func (g *Generator) MySqlTable(t dataset_table.Table) string {
-	createStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;\n", t.GetDataset())
+func (g *Generator) MySqlTable(t dataset_table.Table) (string, string) {
+	createSchemaStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;\n", t.GetDataset())
 	var PrimaryKeys []string
 	var FK []string
+	createStatement := ""
 	if g.dropTable {
 		createStatement += fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", t.FullTableName())
 	}
@@ -124,7 +125,7 @@ func (g *Generator) MySqlTable(t dataset_table.Table) string {
 		createStatement += "," + strings.Join(FK, ",")
 	}
 	createStatement += "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8;"
-	return createStatement
+	return createSchemaStatement, createStatement
 }
 
 func getType(myvar interface{}) string {
