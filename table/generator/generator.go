@@ -79,7 +79,7 @@ func (g *Generator) Table(database string, s interface{}) (dataset_table.Table, 
 }
 
 func (g *Generator) MySqlTable(t dataset_table.Table) (string, string) {
-	createSchemaStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;\n", t.GetDataset())
+	createSchemaStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", t.GetDataset())
 	var PrimaryKeys []string
 	var FK []string
 	createStatement := ""
@@ -124,7 +124,7 @@ func (g *Generator) MySqlTable(t dataset_table.Table) (string, string) {
 	if len(FK) > 0 {
 		createStatement += "," + strings.Join(FK, ",")
 	}
-	createStatement += "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8;"
+	createStatement += "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8"
 	return createSchemaStatement, createStatement
 }
 
