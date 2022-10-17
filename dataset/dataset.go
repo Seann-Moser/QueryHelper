@@ -5,13 +5,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/Seann-Moser/QueryHelper/table/dataset_table"
-	"github.com/Seann-Moser/QueryHelper/table/generator"
+	"reflect"
+	"strings"
+
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
-	"reflect"
-	"strings"
+
+	"github.com/Seann-Moser/QueryHelper/table/dataset_table"
+	"github.com/Seann-Moser/QueryHelper/table/generator"
 )
 
 type Dataset struct {
@@ -24,9 +26,11 @@ type Dataset struct {
 	generator       *generator.Generator
 	dryRun          bool
 	createTable     bool
+
+	cache Cache
 }
 
-func New(ctx context.Context, name string, createTable, dropTable bool, logger *zap.Logger, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
+func New(ctx context.Context, name string, createTable, dropTable bool, logger *zap.Logger, db *sqlx.DB, cache Cache, structsToTables ...interface{}) (*Dataset, error) {
 	d := Dataset{
 		Name:            name,
 		structsToTables: structsToTables,
@@ -37,6 +41,7 @@ func New(ctx context.Context, name string, createTable, dropTable bool, logger *
 		generator:       generator.New(dropTable, logger),
 		dryRun:          db == nil,
 		createTable:     createTable,
+		cache:           cache,
 	}
 	for _, i := range d.structsToTables {
 		err := d.AddTable(i)
@@ -156,12 +161,21 @@ func (d *Dataset) Select(ctx context.Context, s interface{}, whereStmts ...strin
 	if err != nil {
 		return nil, err
 	}
-	t := map[string]interface{}{}
-	err = json.Unmarshal(b, &t)
+	args := map[string]interface{}{}
+	err = json.Unmarshal(b, &args)
 	if err != nil {
 		return nil, err
 	}
-	return d.namedQuery(ctx, stmt, t)
+	table, found := d.Tables[getType(s)]
+	if found {
+		rs, err := d.cache.Get(args, table)
+		if err == nil && rs != nil {
+			return rs, nil
+		}
+	}
+	rows, err := d.namedQuery(ctx, stmt, args)
+	d.cache.Set(rows, args, table)
+	return rows, err
 
 }
 
@@ -186,8 +200,15 @@ func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, 
 		if err != nil {
 			return nil, err
 		}
+		rs, err := d.cache.Get(args, tables...)
+		if err == nil && rs != nil {
+			return rs, nil
+		}
+
 		query := v.SelectJoin(selectCol, whereStr, tables[1:]...)
-		return d.namedQuery(ctx, query, interface{}(args))
+		rows, err := d.namedQuery(ctx, query, interface{}(args))
+		d.cache.Set(rows, args, tables...)
+		return rows, err
 	}
 	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
 }

@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
-	"go.uber.org/zap"
 	"testing"
+	"time"
+
+	"go.uber.org/zap"
 )
 
 type User struct {
@@ -38,7 +40,7 @@ func TestDataset_SelectJoin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ds, err := New(context.Background(), "account", false, true, logger, nil, User{}, UserPasswords{})
+	ds, err := New(context.Background(), "account", false, true, logger, nil, NewGoCache(context.Background(), 5*time.Second, logger), User{}, UserPasswords{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,4 +49,5 @@ func TestDataset_SelectJoin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 }
