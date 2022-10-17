@@ -50,7 +50,7 @@ func TestGenerator_CreateMySqlTable(t *testing.T) {
 	value int NOT NULL,
 	day varchar(256) NOT NULL DEFAULT NOW(),
 	CONSTRAINT PK_test_test PRIMARY KEY (id,url_path,sub_domain)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;`,
+) ENGINE=InnoDB DEFAULT CHARSET=utf8`,
 		},
 		{
 			Name:                 "FullTest",
@@ -67,7 +67,7 @@ func TestGenerator_CreateMySqlTable(t *testing.T) {
 	updated_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	created_timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
 	CONSTRAINT PK_test_test PRIMARY KEY (book_id,chapter_number,language)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;`,
+) ENGINE=InnoDB DEFAULT CHARSET=utf8`,
 		},
 	}
 	for _, tc := range tcs {
