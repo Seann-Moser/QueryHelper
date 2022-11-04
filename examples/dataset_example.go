@@ -2,11 +2,12 @@ package examples
 
 import (
 	"context"
+	"log"
+
+	"go.uber.org/zap"
+
 	"github.com/Seann-Moser/QueryHelper/dataset"
 	"github.com/Seann-Moser/QueryHelper/table"
-	"go.uber.org/zap"
-	"log"
-	"time"
 )
 
 type User struct {
@@ -33,7 +34,7 @@ func DatasetExample() {
 	ctx := context.Background()
 
 	// set sqlx db to enable full functionality
-	ds, err := dataset.New(ctx, "default", true, false, logger, nil, dataset.NewGoCache(context.Background(), 5*time.Second, logger), User{}, UserSettings{})
+	ds, err := dataset.New(ctx, "default", true, false, logger, nil, User{}, UserSettings{})
 	if err != nil {
 		logger.Fatal("failed creating dataset")
 	}
