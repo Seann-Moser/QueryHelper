@@ -28,6 +28,14 @@ type UserPasswords struct {
 	CreatedTimestamp string `db:"created_timestamp" json:"created_timestamp" q_config:"update,skip,data_type:TIMESTAMP,update,default:NOW()"`
 }
 
+type UserAPIKey struct {
+	ID               string `db:"id" json:"id" q_config:"primary,foreign_key:id,foreign_table:User,where:=,join"`
+	APIKey           string `db:"api_key" json:"api_key" q_config:"primary,where:="`
+	Active           bool   `db:"active" json:"active" q_config:"where:=,default:true,update"`
+	ExpiresTimestamp string `db:"expires_timestamp" json:"expires_timestamp" q_config:"data_type:TIMESTAMP,skip,default:DATE_ADD(CURRENT_TIMESTAMP(){{comma}}INTERVAL 30 DAY),where:>="`
+	CreatedTimestamp string `db:"created_timestamp" json:"created_timestamp" q_config:"update,skip,data_type:TIMESTAMP,update,default:NOW()"`
+}
+
 func (u *UserPasswords) HashPassword(salt string) {
 	h := sha256.New()
 	h.Write([]byte(u.Password + salt))

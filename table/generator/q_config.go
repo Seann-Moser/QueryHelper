@@ -34,7 +34,7 @@ func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*dataset_t
 			if key == "data_type" {
 				con["data_type"] = value
 			}
-			con[key] = strings.ReplaceAll(value, "{{comma}}", ";")
+			con[key] = strings.ReplaceAll(value, "{{comma}}", ",")
 		default:
 			if value != "" {
 				t, err := strconv.ParseBool(value)

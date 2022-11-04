@@ -64,8 +64,12 @@ func (d *Dataset) AddTable(s interface{}) error {
 	return nil
 }
 func (d *Dataset) CreateTable(t dataset_table.Table) error {
-	sqlStmt := d.generator.MySqlTable(t)
-	_, err := d.execQuery(d.ctx, sqlStmt)
+	schema, sqlStmt := d.generator.MySqlTable(t)
+	_, err := d.DB.ExecContext(d.ctx, schema)
+	if err != nil {
+		return err
+	}
+	_, err = d.DB.ExecContext(d.ctx, sqlStmt)
 	return err
 }
 

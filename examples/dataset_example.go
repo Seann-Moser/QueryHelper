@@ -2,10 +2,12 @@ package examples
 
 import (
 	"context"
+	"log"
+
+	"go.uber.org/zap"
+
 	"github.com/Seann-Moser/QueryHelper/dataset"
 	"github.com/Seann-Moser/QueryHelper/table"
-	"go.uber.org/zap"
-	"log"
 )
 
 type User struct {
