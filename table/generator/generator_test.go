@@ -1,10 +1,11 @@
 package generator
 
 import (
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 type TestCase struct {

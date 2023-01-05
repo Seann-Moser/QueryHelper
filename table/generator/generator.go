@@ -107,7 +107,7 @@ func (g *Generator) ColumnUpdater(ctx context.Context, db *sqlx.DB, t dataset_ta
 		}
 	}
 
-	alterTable := fmt.Sprintf("ALTER TABLE %s ;", t.FullTableName())
+	alterTable := fmt.Sprintf("ALTER TABLE %s ", t.FullTableName())
 
 	if len(addColumns) > 0 {
 		addStmt := generateColumnStatements(alterTable, "add", addColumns)
@@ -131,6 +131,9 @@ func (g *Generator) ColumnUpdater(ctx context.Context, db *sqlx.DB, t dataset_ta
 }
 
 func getColumns(ctx context.Context, db *sqlx.DB, t dataset_table.Table) ([]*sql.ColumnType, error) {
+	if db == nil {
+		return nil, nil
+	}
 	rows, err := db.QueryxContext(ctx, fmt.Sprintf("SELECT * FROM %s limit 1;", t.FullTableName()))
 	if err != nil {
 		return nil, err

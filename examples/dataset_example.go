@@ -34,7 +34,7 @@ func DatasetExample() {
 	ctx := context.Background()
 
 	// set sqlx db to enable full functionality
-	ds, err := dataset.New(ctx, "default", true, false, logger, nil, User{}, UserSettings{})
+	ds, err := dataset.New(ctx, "default", true, false, true, logger, nil, User{}, UserSettings{})
 	if err != nil {
 		logger.Fatal("failed creating dataset")
 	}
