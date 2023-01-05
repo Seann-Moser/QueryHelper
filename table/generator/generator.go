@@ -1,10 +1,15 @@
 package generator
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
-	"github.com/Seann-Moser/QueryHelper/table/dataset_table"
 	"reflect"
 	"strings"
+
+	"github.com/jmoiron/sqlx"
+
+	"github.com/Seann-Moser/QueryHelper/table/dataset_table"
 
 	"go.uber.org/zap"
 )
@@ -78,6 +83,83 @@ func (g *Generator) Table(database string, s interface{}) (dataset_table.Table, 
 	return &newTable, nil
 }
 
+func (g *Generator) ColumnUpdater(ctx context.Context, db *sqlx.DB, t dataset_table.Table) error {
+	cols, err := getColumns(ctx, db, t)
+	if err != nil {
+		return err
+	}
+	var addColumns []*dataset_table.Element
+	var removeColumns []*dataset_table.Element
+	colMap := map[string]*sql.ColumnType{}
+	for _, c := range cols {
+		colMap[c.Name()] = c
+	}
+
+	for _, e := range t.GetElements() {
+		if _, found := colMap[e.Name]; !found {
+			addColumns = append(addColumns, e)
+		}
+	}
+
+	for _, c := range cols {
+		if e := t.FindElementWithName(c.Name()); e == nil {
+			removeColumns = append(removeColumns, e)
+		}
+	}
+
+	alterTable := fmt.Sprintf("ALTER TABLE %s ;", t.FullTableName())
+
+	if len(addColumns) > 0 {
+		addStmt := generateColumnStatements(alterTable, "add", addColumns)
+		g.logger.Debug("adding columns to table", zap.String("table", t.FullTableName()), zap.String("query", addStmt))
+		_, err := db.ExecContext(ctx, addStmt)
+		if err != nil {
+			return err
+		}
+	}
+	if len(removeColumns) > 0 {
+		removeStmt := generateColumnStatements(alterTable, "remove", removeColumns)
+		g.logger.Debug("removing columns from table", zap.String("table", t.FullTableName()), zap.String("query", removeStmt))
+		_, err := db.ExecContext(ctx, removeStmt)
+		if err != nil {
+			return err
+		}
+
+	}
+	t.SelectStatement("")
+	return nil
+}
+
+func getColumns(ctx context.Context, db *sqlx.DB, t dataset_table.Table) ([]*sql.ColumnType, error) {
+	rows, err := db.QueryxContext(ctx, fmt.Sprintf("SELECT * FROM %s limit 1;", t.FullTableName()))
+	if err != nil {
+		return nil, err
+	}
+	cols, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+	return cols, nil
+}
+
+func generateColumnStatements(alterTable, columnType string, e []*dataset_table.Element) string {
+	output := []string{}
+	for _, el := range e {
+		output = append(output, generateColumnStmt(columnType, el))
+	}
+	return fmt.Sprintf("%s %s;", alterTable, strings.Join(output, ","))
+
+}
+func generateColumnStmt(columnType string, e *dataset_table.Element) string {
+	switch strings.ToLower(columnType) {
+	case "drop":
+		return fmt.Sprintf("DROP COLUMN %s;", e.Name)
+	case "add":
+		return fmt.Sprintf("ADD %s", e.GetColumnDef())
+	}
+	return ""
+}
+
 func (g *Generator) MySqlTable(t dataset_table.Table) (string, string) {
 	createSchemaStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", t.GetDataset())
 	var PrimaryKeys []string
@@ -89,23 +171,7 @@ func (g *Generator) MySqlTable(t dataset_table.Table) (string, string) {
 	createStatement += fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s(", t.FullTableName())
 
 	for _, element := range t.GetElements() {
-		elementString := fmt.Sprintf("\n\t%s %s", element.Name, element.Type)
-		if !element.Null {
-			elementString += " NOT NULL"
-		}
-		switch element.Default {
-		case "created_timestamp":
-			elementString += " DEFAULT NOW()"
-		case "updated_timestamp":
-			elementString += " DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
-		case "":
-			if element.Null {
-				elementString += " DEFAULT NULL"
-			}
-		default:
-			elementString += fmt.Sprintf(" DEFAULT %s", element.Default)
-		}
-		createStatement += elementString + ","
+		createStatement += element.GetColumnDef() + ","
 		if element.Primary {
 			PrimaryKeys = append(PrimaryKeys, element.Name)
 		}
