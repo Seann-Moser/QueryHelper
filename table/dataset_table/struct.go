@@ -1,5 +1,7 @@
 package dataset_table
 
+import "fmt"
+
 type Table interface {
 	Info
 	Statements
@@ -38,4 +40,24 @@ type Element struct {
 	Order string `json:"order"`
 
 	AutoGenerateIDType string `json:"auto_generate_id_type"`
+}
+
+func (e *Element) GetColumnDef() string {
+	elementString := fmt.Sprintf("\n\t%s %s", e.Name, e.Type)
+	if !e.Null {
+		elementString += " NOT NULL"
+	}
+	switch e.Default {
+	case "created_timestamp":
+		elementString += " DEFAULT NOW()"
+	case "updated_timestamp":
+		elementString += " DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+	case "":
+		if e.Null {
+			elementString += " DEFAULT NULL"
+		}
+	default:
+		elementString += fmt.Sprintf(" DEFAULT %s", e.Default)
+	}
+	return elementString
 }

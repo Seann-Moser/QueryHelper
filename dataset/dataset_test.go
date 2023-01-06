@@ -47,7 +47,7 @@ func TestDataset_SelectJoin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ds, err := New(context.Background(), "account", false, true, logger, nil, User{}, UserPasswords{})
+	ds, err := New(context.Background(), "account", false, true, true, logger, nil, User{}, UserPasswords{})
 	if err != nil {
 		t.Fatal(err)
 	}

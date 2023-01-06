@@ -26,9 +26,10 @@ type Dataset struct {
 	generator       *generator.Generator
 	dryRun          bool
 	createTable     bool
+	updateCols      bool
 }
 
-func New(ctx context.Context, name string, createTable, dropTable bool, logger *zap.Logger, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
+func New(ctx context.Context, name string, createTable, dropTable, updateCols bool, logger *zap.Logger, db *sqlx.DB, structsToTables ...interface{}) (*Dataset, error) {
 	d := Dataset{
 		Name:            name,
 		structsToTables: structsToTables,
@@ -39,6 +40,7 @@ func New(ctx context.Context, name string, createTable, dropTable bool, logger *
 		generator:       generator.New(dropTable, logger),
 		dryRun:          db == nil,
 		createTable:     createTable,
+		updateCols:      updateCols,
 	}
 	for _, i := range d.structsToTables {
 		err := d.AddTable(i)
@@ -70,6 +72,15 @@ func (d *Dataset) CreateTable(t dataset_table.Table) error {
 		return err
 	}
 	_, err = d.DB.ExecContext(d.ctx, sqlStmt)
+	if err != nil {
+		return err
+	}
+	if d.updateCols {
+		err = d.generator.ColumnUpdater(d.ctx, d.DB, t)
+		if err != nil {
+			return err
+		}
+	}
 	return err
 }
 
