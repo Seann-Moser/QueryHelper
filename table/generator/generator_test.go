@@ -27,8 +27,8 @@ type FullTestStruct struct {
 	ID               string `json:"chapter_id" db:"chapter_id" q_config:"where:=,delete,auto_generate_id,auto_generate_id_type:base64"`
 	Public           bool   `json:"public" db:"public" q_config:"default:true"`
 	BookID           string `json:"book_id" db:"book_id" q_config:"primary"`
-	Number           int    `json:"chapter_number" db:"chapter_number" q_config:"primary,update"`
-	Language         string `json:"language" db:"language" q_config:"primary,update"`
+	Number           int    `json:"chapter_number" db:"chapter_number" q_config:"primary,update,order"`
+	Language         string `json:"language" db:"language" q_config:"primary,update,order,order_priority:1"`
 	Image            string `json:"cover_image" db:"cover_image" q_config:"update"`
 	UpdatedTimestamp string `db:"updated_timestamp" json:"updated_timestamp" q_config:"skip,default:updated_timestamp" `
 	CreatedTimestamp string `db:"created_timestamp" json:"created_timestamp" q_config:"skip,default:created_timestamp"`
@@ -97,6 +97,7 @@ func TestGenerator_CreateMySqlTable(t *testing.T) {
 					}
 				}
 			}
+			println(table.SelectStatement())
 		})
 	}
 }

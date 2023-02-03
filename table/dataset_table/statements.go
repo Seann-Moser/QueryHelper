@@ -5,8 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/google/uuid"
+	"sort"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 type Statements interface {
@@ -86,9 +88,34 @@ func (t *DefaultTable) SelectStatement(where ...string) string {
 	}
 	selectStmt := fmt.Sprintf("SELECT %s FROM %s.%s ", strings.Join(selectValues, ", "), t.Dataset, t.Name)
 	selectStmt += whereStmt
+	selectStmt += t.getOrder()
 	return selectStmt
 }
+func (t *DefaultTable) getOrder() string {
+	order := []*Element{}
+	for _, e := range t.Elements {
+		if e.Order {
+			order = append(order, e)
+		}
+	}
+	if len(order) == 0 {
+		return ""
+	}
+	sort.Slice(order, func(i, j int) bool {
+		return order[i].OrderPriority > order[j].OrderPriority
+	})
+	output := []string{}
+	for _, e := range order {
+		v := t.FullElementName(e)
+		if !e.OrderAsc {
+			v += " DESC"
+		}
+		output = append(output, v)
+	}
 
+	return fmt.Sprintf(" ORDER BY %s ", strings.Join(output, ","))
+
+}
 func (t *DefaultTable) UpdateStatement() string {
 	var setValues []string
 	var whereValues []string
