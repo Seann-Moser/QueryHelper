@@ -23,14 +23,14 @@ type User struct {
 
 type UserPasswords struct {
 	ID               string `db:"id" json:"id" q_config:"primary,foreign_key:id,foreign_table:User,where:=,join"`
-	Password         string `db:"password" json:"password" q_config:"primary,where:="`
+	Password         string `db:"password" json:"password" q_config:"primary,where:in"`
 	Active           bool   `db:"active" json:"active" q_config:"where:=,default:true,update"`
 	CreatedTimestamp string `db:"created_timestamp" json:"created_timestamp" q_config:"update,skip,data_type:TIMESTAMP,update,default:NOW()"`
 }
 
 type UserAPIKey struct {
 	ID               string `db:"id" json:"id" q_config:"primary,foreign_key:id,foreign_table:User,where:=,join"`
-	APIKey           string `db:"api_key" json:"api_key" q_config:"primary,where:="`
+	APIKey           string `db:"api_key" json:"api_key" q_config:"primary,where:IN"`
 	Active           bool   `db:"active" json:"active" q_config:"where:=,default:true,update"`
 	ExpiresTimestamp string `db:"expires_timestamp" json:"expires_timestamp" q_config:"data_type:TIMESTAMP,skip,default:DATE_ADD(CURRENT_TIMESTAMP(){{comma}}INTERVAL 30 DAY),where:>="`
 	CreatedTimestamp string `db:"created_timestamp" json:"created_timestamp" q_config:"update,skip,data_type:TIMESTAMP,update,default:NOW()"`
@@ -42,6 +42,7 @@ func (u *UserPasswords) HashPassword(salt string) {
 	bs := h.Sum(nil)
 	u.Password = base64.StdEncoding.EncodeToString(bs)
 }
+
 func TestDataset_SelectJoin(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
@@ -52,9 +53,48 @@ func TestDataset_SelectJoin(t *testing.T) {
 		t.Fatal(err)
 	}
 	userPassword := UserPasswords{}
+
+	query, err := ds.SelectJoinStatement(context.Background(), nil, []string{"user_name", "password", "active"}, User{}, userPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	println(query)
+
+	passwordQuery, err := ds.SelectStatement(userPassword, "AND", []string{"password"}, "id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	println(passwordQuery)
+	userPassword.Password = passwordQuery
 	_, err = ds.SelectJoin(context.Background(), nil, []string{"user_name", "password", "active"}, User{}, userPassword)
 	if err != nil {
 		t.Fatal(err)
 	}
+	println(query)
+}
+
+func TestDataset_Select(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ds, err := New(context.Background(), "account", false, true, true, logger, nil, UserAPIKey{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmt, err := ds.SelectStatement(UserAPIKey{}, "AND", nil, "api_key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	println(stmt)
+	c, err := combineStructs(UserAPIKey{APIKey: "test1,test2,test3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmt = fixArrays(stmt, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logger.Info("", zap.String("query", stmt), zap.Any("args", c))
 
 }

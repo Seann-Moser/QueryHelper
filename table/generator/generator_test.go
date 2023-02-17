@@ -97,7 +97,7 @@ func TestGenerator_CreateMySqlTable(t *testing.T) {
 					}
 				}
 			}
-			println(table.SelectStatement())
+			println(table.SelectStatement("AND", nil))
 		})
 	}
 }
