@@ -26,6 +26,9 @@ type Element struct {
 	AutoGenerateID bool `json:"auto_generate_id"`
 	Join           bool `json:"join"`
 	OrderAsc       bool `json:"order_asc"`
+	Order          bool `json:"order"`
+
+	OrderPriority int `json:"order_priority"`
 
 	Type    string `json:"data_type"`
 	Default string `json:"default"`
@@ -36,8 +39,6 @@ type Element struct {
 	WhereJoin string `json:"where_join"`
 	Where     string `json:"where"`
 	JoinName  string `json:"join_name"`
-
-	Order string `json:"order"`
 
 	AutoGenerateIDType string `json:"auto_generate_id_type"`
 }

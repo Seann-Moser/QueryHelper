@@ -5,13 +5,15 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/google/uuid"
+	"sort"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 type Statements interface {
 	InsertStatement() string
-	SelectStatement(where ...string) string
+	SelectStatement(conditional string, cols []string, where ...string) string
 	UpdateStatement() string
 	DeleteStatement() string
 	CountStatement(conditional string, whereElementsStr ...string) string
@@ -78,17 +80,56 @@ func (t *DefaultTable) InsertStatement() string {
 		strings.Join(columnNames, ","), strings.Join(values, ","))
 	return insert
 }
-func (t *DefaultTable) SelectStatement(where ...string) string {
-	var selectValues = t.GetSelectableElements(false)
+
+func (t *DefaultTable) SelectStatement(conditional string, cols []string, where ...string) string {
+	var selectValues = []string{}
+	if cols == nil || len(cols) == 0 {
+		selectValues = t.GetSelectableElements(false)
+	} else {
+		for _, c := range cols {
+			e := t.FindElementWithName(c)
+			if e != nil {
+				continue
+			}
+			selectValues = append(selectValues, t.FullElementName(e))
+		}
+		selectValues = cols
+	}
 	whereStmt := ""
 	if len(where) > 0 {
-		whereStmt = t.WhereStatement("AND", where...)
+		whereStmt = t.WhereStatement(conditional, where...)
 	}
 	selectStmt := fmt.Sprintf("SELECT %s FROM %s.%s ", strings.Join(selectValues, ", "), t.Dataset, t.Name)
 	selectStmt += whereStmt
+	selectStmt += t.getOrder()
 	return selectStmt
 }
 
+func (t *DefaultTable) getOrder() string {
+	order := []*Element{}
+	for _, e := range t.Elements {
+		if e.Order {
+			order = append(order, e)
+		}
+	}
+	if len(order) == 0 {
+		return ""
+	}
+	sort.Slice(order, func(i, j int) bool {
+		return order[i].OrderPriority > order[j].OrderPriority
+	})
+	output := []string{}
+	for _, e := range order {
+		v := t.FullElementName(e)
+		if !e.OrderAsc {
+			v += " DESC"
+		}
+		output = append(output, v)
+	}
+
+	return fmt.Sprintf(" ORDER BY %s ", strings.Join(output, ","))
+
+}
 func (t *DefaultTable) UpdateStatement() string {
 	var setValues []string
 	var whereValues []string
@@ -140,41 +181,12 @@ func (t *DefaultTable) CountStatement(conditional string, whereElementsStr ...st
 func (t *DefaultTable) SelectJoin(selectCol, whereElementsStr []string, joinTables ...Table) string {
 	validTables := []Table{t}
 	var joinStmts []string
-	var whereValues []string
-	for _, i := range whereElementsStr {
-		element := t.FindElementWithName(i)
-		if element != nil {
-			tmp := element.Where
-			if element.Where == "" {
-				tmp = "="
-			}
-			formatted := fmt.Sprintf("%s %s :%s", t.FullElementName(element), tmp, element.Name)
-			if strings.Contains(formatted, ".") {
-				whereValues = append(whereValues, formatted)
-			}
-		}
-	}
+	whereValues := t.WhereValues(whereElementsStr...)
 	for _, currentTable := range joinTables {
-		commonElements, wv := t.FindCommonElementName(currentTable)
+		whereValues = append(whereValues, currentTable.WhereValues(whereElementsStr...)...)
+		commonElements, _ := t.FindCommonElementName(currentTable)
 		if len(commonElements) == 0 {
 			continue
-		}
-		if len(whereElementsStr) == 0 {
-			whereValues = append(whereValues, wv...)
-		} else {
-			for _, i := range whereElementsStr {
-				element := currentTable.FindElementWithName(i)
-				if element != nil {
-					tmp := element.Where
-					if element.Where == "" {
-						tmp = "="
-					}
-					formatted := fmt.Sprintf("%s %s :%s", currentTable.FullElementName(element), tmp, element.Name)
-					if strings.Contains(formatted, ".") {
-						whereValues = append(whereValues, formatted)
-					}
-				}
-			}
 		}
 		validTables = append(validTables, currentTable)
 		joinStmt := fmt.Sprintf(" JOIN %s ON %s", currentTable.FullTableName(), strings.Join(commonElements, " AND "))
@@ -207,10 +219,18 @@ func (t *DefaultTable) SelectJoin(selectCol, whereElementsStr []string, joinTabl
 
 		}
 	}
-
+	var wv []string
+	dedupWhereMap := map[string]bool{}
+	for _, w := range whereValues {
+		if _, found := dedupWhereMap[w]; found {
+			continue
+		}
+		wv = append(wv, w)
+		dedupWhereMap[w] = true
+	}
 	whereStmt := ""
-	if len(whereValues) > 0 {
-		whereStmt = fmt.Sprintf(" WHERE %s", strings.Join(whereValues, " AND "))
+	if len(wv) > 0 {
+		whereStmt = fmt.Sprintf(" WHERE %s", strings.Join(wv, " AND "))
 	}
 	strings.Join(selectValues, ",")
 	selectStmt := fmt.Sprintf("SELECT %s FROM %s %s %s", strings.Join(selectValues, ","), t.FullTableName(), strings.Join(joinStmts, " "), whereStmt)

@@ -126,7 +126,7 @@ func (g *Generator) ColumnUpdater(ctx context.Context, db *sqlx.DB, t dataset_ta
 		}
 
 	}
-	t.SelectStatement("")
+	t.SelectStatement("", nil)
 	return nil
 }
 

@@ -164,8 +164,8 @@ func (d *Dataset) DeleteAllReferences(ctx context.Context, s interface{}) (sql.R
 	return nil, err
 }
 
-func (d *Dataset) Select(ctx context.Context, s interface{}, whereStmts ...string) (*sqlx.Rows, error) {
-	stmt, err := d.SelectStatement(s, whereStmts...)
+func (d *Dataset) Select(ctx context.Context, s interface{}, conditional string, whereStmts ...string) (*sqlx.Rows, error) {
+	stmt, err := d.SelectStatement(s, conditional, nil, whereStmts...)
 	if err != nil {
 		return nil, err
 	}
@@ -183,15 +183,15 @@ func (d *Dataset) Select(ctx context.Context, s interface{}, whereStmts ...strin
 
 }
 
-func (d *Dataset) SelectStatement(s interface{}, whereStmts ...string) (string, error) {
+func (d *Dataset) SelectStatement(s interface{}, conditional string, cols []string, whereStmts ...string) (string, error) {
 	if v, found := d.Tables[getType(s)]; found {
-		selectStatement := v.SelectStatement(whereStmts...)
+		selectStatement := v.SelectStatement(conditional, cols, whereStmts...)
 		return selectStatement, nil
 	}
 	return "", fmt.Errorf("unable to find insert for type: %s", getType(s))
 }
 
-func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, s ...interface{}) (*sqlx.Rows, error) {
+func (d *Dataset) SelectJoinStatement(ctx context.Context, selectCol, whereStr []string, s ...interface{}) (string, error) {
 	if v, found := d.Tables[getType(s[0])]; found {
 		var tables []dataset_table.Table
 		for _, t := range s {
@@ -200,16 +200,21 @@ func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, 
 				tables = append(tables, v)
 			}
 		}
-		args, err := combineStructs(s[0:]...)
-		if err != nil {
-			return nil, err
-		}
 
 		query := v.SelectJoin(selectCol, whereStr, tables[1:]...)
-		rows, err := d.namedQuery(ctx, query, interface{}(args))
-		return rows, err
+		return query, nil
 	}
-	return nil, fmt.Errorf("unable to find insert for type: %s", getType(s))
+	return "", fmt.Errorf("unable to find insert for type: %s", getType(s))
+}
+
+func (d *Dataset) SelectJoin(ctx context.Context, selectCol, whereStr []string, s ...interface{}) (*sqlx.Rows, error) {
+	query, err := d.SelectJoinStatement(ctx, selectCol, whereStr, s...)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := d.namedQuery(ctx, query, s...)
+	return rows, err
 }
 
 func (d *Dataset) execQuery(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
@@ -222,10 +227,47 @@ func (d *Dataset) execQuery(ctx context.Context, query string, args ...interface
 
 func (d *Dataset) namedQuery(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error) {
 	d.logger.Debug("running named query", zap.String("query", query), zap.Any("args", args))
+	a, err := combineStructs(args...)
+	if err != nil {
+		return nil, err
+	}
+	query = fixArrays(query, a)
 	if d.dryRun {
 		return nil, nil
 	}
-	return d.DB.NamedQueryContext(ctx, query, interface{}(args))
+
+	return d.DB.NamedQueryContext(ctx, query, a)
+}
+func fixArrays(query string, args map[string]interface{}) string {
+	for k, v := range args {
+		namedArg := fmt.Sprintf("(:%s)", k)
+		if strings.Contains(query, namedArg) {
+			s := saveString(v)
+			if s == "" {
+				continue
+			}
+			if strings.HasPrefix(s, "SELECT") {
+				query = strings.ReplaceAll(query, namedArg, fmt.Sprintf("(%s)", s))
+				continue
+			}
+			st := strings.Split(s, ",")
+			newArgs := []string{}
+			for i := 0; i < len(st); i++ {
+				newKey := fmt.Sprintf(":%s_%d", k, i)
+				newArgs = append(newArgs, newKey)
+				args[newKey] = st[i]
+			}
+			query = strings.ReplaceAll(query, namedArg, fmt.Sprintf("(%s)", strings.Join(newArgs, ",")))
+		}
+	}
+	return query
+}
+func saveString(d interface{}) string {
+	switch v := d.(type) {
+	case string:
+		return v
+	}
+	return ""
 }
 
 func combineStructs(i ...interface{}) (map[string]interface{}, error) {

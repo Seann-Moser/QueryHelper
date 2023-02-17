@@ -11,6 +11,7 @@ type Info interface {
 	GetDataset() string
 	GetTableName() string
 	FullElementName(e *Element) string
+	WhereValues(whereElementsStr ...string) []string
 	WhereStatement(conditional string, whereElementsStr ...string) string
 	FindElementWithName(name string) *Element
 	GetSelectableElements(fullNames bool) []string
@@ -48,7 +49,7 @@ func (t *DefaultTable) FullElementName(e *Element) string {
 	return fmt.Sprintf("%s.%s", t.Name, e.Name)
 }
 
-func (t *DefaultTable) WhereStatement(conditional string, whereElementsStr ...string) string {
+func (t *DefaultTable) WhereValues(whereElementsStr ...string) []string {
 	var whereValues []string
 	for _, i := range whereElementsStr {
 		element := t.FindElementWithName(i)
@@ -57,12 +58,25 @@ func (t *DefaultTable) WhereStatement(conditional string, whereElementsStr ...st
 			if element.Where == "" {
 				tmp = "="
 			}
-			formatted := fmt.Sprintf("%s %s :%s", t.FullElementName(element), tmp, element.Name)
+			var formatted string
+			switch strings.TrimSpace(strings.ToLower(tmp)) {
+			case "not in":
+				fallthrough
+			case "in":
+				formatted = fmt.Sprintf("%s %s (:%s)", t.FullElementName(element), tmp, element.Name)
+			default:
+				formatted = fmt.Sprintf("%s %s :%s", t.FullElementName(element), tmp, element.Name)
+			}
 			if strings.Contains(formatted, ".") {
 				whereValues = append(whereValues, formatted)
 			}
 		}
 	}
+	return whereValues
+
+}
+func (t *DefaultTable) WhereStatement(conditional string, whereElementsStr ...string) string {
+	whereValues := t.WhereValues(whereElementsStr...)
 	if len(whereValues) == 0 {
 		return ""
 	}
