@@ -34,20 +34,21 @@ func NewTable[T any](databaseName string) (*Table[T], error) {
 	var setPrimary bool
 	for i := 0; i < structType.NumField(); i++ {
 		var column *Column
-		name := structType.Field(i).Tag.Get(TagColumnNamePrefix)
+		field := structType.Field(i)
+		name := field.Tag.Get(TagColumnNamePrefix)
 		if name == "" {
 			name = structType.Field(i).Name
 		}
 
-		if value := structType.Field(i).Tag.Get(TagConfigPrefix); value != "" {
-			column, err = GetColumnFromTag(column.Name, value, structType.Field(i).Type)
+		if value := field.Tag.Get(TagConfigPrefix); value != "" {
+			column, err = GetColumnFromTag(name, value, field.Type)
 		} else {
-			column, err = GetColumnFromTag(name, "", structType.Field(i).Type)
+			column, err = GetColumnFromTag(name, "", field.Type)
 		}
 
 		if err != nil {
 			return nil, fmt.Errorf("failed parsing struct tag info(%s):%w",
-				structType.Field(i).Tag.Get(TagConfigPrefix),
+				field.Tag.Get(TagConfigPrefix),
 				err)
 		}
 
