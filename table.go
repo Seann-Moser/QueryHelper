@@ -77,6 +77,23 @@ func NewTable[T any](databaseName string) (*Table[T], error) {
 	return &newTable, nil
 }
 
+func (t *Table[T]) InitializeTable(ctx context.Context, db *sqlx.DB, dropTable, updateTable bool) error {
+	stmts, err := t.CreateMySqlTableStatement(dropTable)
+	if err != nil {
+		return err
+	}
+	for _, stmt := range stmts {
+		_, err = db.ExecContext(ctx, stmt)
+		if err != nil {
+			return err
+		}
+	}
+	if !updateTable {
+		return nil
+	}
+	return t.UpdateTable(ctx, db)
+}
+
 func (t *Table[T]) CreateMySqlTableStatement(dropTable bool) ([]string, error) {
 	createSchemaStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", t.Dataset)
 	var PrimaryKeys []string
@@ -219,7 +236,7 @@ func (t *Table[T]) UpdateTable(ctx context.Context, db *sqlx.DB) error {
 }
 
 func (t *Table[T]) NamedSelect(ctx context.Context, db *sqlx.DB, query string, args ...interface{}) ([]*T, error) {
-	rows, err := t.NamedQuery(ctx, db, query, args)
+	rows, err := t.NamedQuery(ctx, db, query, args...)
 	if err != nil {
 		return nil, err
 	}
