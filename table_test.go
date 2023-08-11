@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 type FullTestStruct struct {
 	ID               string `json:"chapter_id" db:"chapter_id" qc:"where:=;delete;auto_generate_id;auto_generate_id_type:base64,join"`
@@ -47,5 +50,20 @@ func TestTableJoin(t *testing.T) {
 	}
 
 	sql, err := fullTable.SelectJoinStmt(nil, GuestRequestsTable.Columns)
+	if err != nil {
+		t.Fatal(err)
+	}
 	println(sql)
+}
+
+func TestTableCtx(t *testing.T) {
+	ctx, err := AddTableCtx[FullTestStruct](context.Background(), nil, "test", false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	table, err := GetTableCtx[FullTestStruct](ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	println(table.Select(ctx, nil))
 }

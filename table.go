@@ -23,12 +23,15 @@ const (
 
 var (
 	NoOverlappingColumnsErr = errors.New("error: no overlapping columns found")
+	MissingPrimaryKeyErr    = errors.New("no field was set as the primary key")
 )
 
 type Table[T any] struct {
 	Dataset string             `json:"dataset"`
 	Name    string             `json:"name"`
 	Columns map[string]*Column `json:"columns"`
+
+	db *sqlx.DB
 }
 
 func NewTable[T any](databaseName string) (*Table[T], error) {
@@ -72,7 +75,7 @@ func NewTable[T any](databaseName string) (*Table[T], error) {
 		newTable.Columns[column.Name] = column
 	}
 	if !setPrimary {
-		return nil, fmt.Errorf("no field was set as the primary key")
+		return nil, MissingPrimaryKeyErr
 	}
 	return &newTable, nil
 }
@@ -82,12 +85,16 @@ func (t *Table[T]) InitializeTable(ctx context.Context, db *sqlx.DB, dropTable, 
 	if err != nil {
 		return err
 	}
+	if db == nil {
+		return nil
+	}
 	for _, stmt := range stmts {
 		_, err = db.ExecContext(ctx, stmt)
 		if err != nil {
 			return err
 		}
 	}
+	t.db = db
 	if !updateTable {
 		return nil
 	}
@@ -114,7 +121,7 @@ func (t *Table[T]) CreateMySqlTableStatement(dropTable bool) ([]string, error) {
 		}
 	}
 	if len(PrimaryKeys) == 0 {
-		return nil, fmt.Errorf("missing primary key")
+		return nil, MissingPrimaryKeyErr
 	} else if len(PrimaryKeys) == 1 {
 		createStatement += fmt.Sprintf("\n\tPRIMARY KEY(%s)", PrimaryKeys[0])
 	} else {
@@ -164,6 +171,9 @@ func (t *Table[T]) WhereValues(whereElementsStr ...string) []string {
 
 func (t *Table[T]) GetColumns(ctx context.Context, db *sqlx.DB) ([]*sql.ColumnType, error) {
 	if db == nil {
+		db = t.db
+	}
+	if db == nil {
 		return nil, nil
 	}
 	rows, err := db.QueryxContext(ctx, fmt.Sprintf("SELECT * FROM %s limit 1;", t.FullTableName()))
@@ -186,6 +196,12 @@ func (t *Table[T]) GetUpdateStmt(add bool, columnList ...*Column) string {
 }
 
 func (t *Table[T]) UpdateTable(ctx context.Context, db *sqlx.DB) error {
+	if db == nil {
+		db = t.db
+	}
+	if db == nil {
+		return nil
+	}
 	cols, err := t.GetColumns(ctx, db)
 	if err != nil {
 		return err
@@ -235,7 +251,28 @@ func (t *Table[T]) UpdateTable(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
+func (t *Table[T]) Select(ctx context.Context, db *sqlx.DB, args ...interface{}) ([]*T, error) {
+	query := fmt.Sprintf("SELECT %s FROM %s", strings.Join(t.GetSelectableColumns(false), ","), t.FullTableName())
+
+	values := WhereValues(t.Columns, false)
+	if len(values) > 0 {
+		query = fmt.Sprintf("%s WHERE %s", query, strings.Join(values, " AND "))
+	}
+
+	order := t.OrderByStatement()
+	if len(order) > 0 {
+		query = fmt.Sprintf("%s %s", query, order)
+	}
+	return t.NamedSelect(ctx, db, query, args...)
+}
+
 func (t *Table[T]) NamedSelect(ctx context.Context, db *sqlx.DB, query string, args ...interface{}) ([]*T, error) {
+	if db == nil {
+		db = t.db
+	}
+	if db == nil {
+		return nil, nil
+	}
 	rows, err := t.NamedQuery(ctx, db, query, args...)
 	if err != nil {
 		return nil, err
@@ -414,6 +451,12 @@ func (t *Table[T]) CountStatement(conditional string, whereElementsStr ...string
 }
 
 func (t *Table[T]) NamedQuery(ctx context.Context, db *sqlx.DB, query string, args ...interface{}) (*sqlx.Rows, error) {
+	if db == nil {
+		db = t.db
+	}
+	if db == nil {
+		return nil, nil
+	}
 	a, err := combineStructs(args...)
 	if err != nil {
 		return nil, err
@@ -503,6 +546,12 @@ func (t *Table[T]) generateWhereStmt(columns map[string]*Column) string {
 }
 
 func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s T) (sql.Result, string, error) {
+	if db == nil {
+		db = t.db
+	}
+	if db == nil {
+		return nil, "", nil
+	}
 	if t.IsAutoGenerateID() {
 		generateIds := t.GenerateID()
 		args, err := combineStructs(generateIds, s)
@@ -517,9 +566,21 @@ func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s T) (sql.Result, st
 }
 
 func (t *Table[T]) Delete(ctx context.Context, db *sqlx.DB, s T) (sql.Result, error) {
+	if db == nil {
+		db = t.db
+	}
+	if db == nil {
+		return nil, nil
+	}
 	return db.NamedExecContext(ctx, t.DeleteStatement(), s)
 }
 
 func (t *Table[T]) Update(ctx context.Context, db *sqlx.DB, s T) (sql.Result, error) {
+	if db == nil {
+		db = t.db
+	}
+	if db == nil {
+		return nil, nil
+	}
 	return db.NamedExecContext(ctx, t.UpdateStatement(), s)
 }
