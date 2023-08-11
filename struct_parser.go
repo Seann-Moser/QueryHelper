@@ -1,21 +1,32 @@
-package generator
+package main
 
 import (
 	"encoding/json"
 	"reflect"
 	"strconv"
 	"strings"
-
-	"github.com/Seann-Moser/QueryHelper/table/dataset_table"
 )
 
-func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*dataset_table.Element, error) {
-	dataPoints := strings.Split(data, ",")
+const (
+	TableTypeInt     = "int"
+	TableTypeFloat   = "int"
+	TableTypeVarChar = "varchar(256)"
+	TableTypeText    = "text"
+	TableTypeBool    = "tinyint(1)"
+	TableTime        = "timestamp"
+
+	SplitString = ";"
+	EqualSplit  = "::"
+)
+
+func GetColumnFromTag(name, data string, p reflect.Type) (*Column, error) {
+	dataPoints := strings.Split(data, SplitString)
 	con := map[string]interface{}{}
 	con["select"] = true
 	con["data_type"] = convertTypeToSql(name, p)
+	con["name"] = name
 	for _, row := range dataPoints {
-		v := strings.Split(row, ":")
+		v := strings.Split(row, EqualSplit)
 		key := strings.TrimSpace(v[0])
 		value := ""
 		if len(v) > 1 {
@@ -35,7 +46,7 @@ func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*dataset_t
 			if key == "data_type" {
 				con["data_type"] = value
 			}
-			con[key] = strings.ReplaceAll(value, "{{comma}}", ",")
+			con[key] = value
 		case "order_priority":
 			v, err := strconv.ParseInt(value, 10, 64)
 			if err == nil {
@@ -57,12 +68,20 @@ func (g *Generator) qConfigParser(name, data string, p reflect.Type) (*dataset_t
 	if err != nil {
 		return nil, err
 	}
-	config := &dataset_table.Element{}
+	config := &Column{}
 	err = json.Unmarshal(b, config)
 	if err != nil {
 		return nil, err
 	}
 	return config, err
+}
+
+func getType(myVar interface{}) string {
+	if t := reflect.TypeOf(myVar); t.Kind() == reflect.Ptr {
+		return t.Elem().Name()
+	} else {
+		return t.Name()
+	}
 }
 
 func convertTypeToSql(name string, v reflect.Type) string {
