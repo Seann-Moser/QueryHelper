@@ -31,6 +31,7 @@ func (t *DefaultTable) IsAutoGenerateID() bool {
 	}
 	return false
 }
+
 func (t *DefaultTable) GetGenerateID() []*Element {
 	var output []*Element
 	for _, e := range t.Elements {
@@ -40,6 +41,7 @@ func (t *DefaultTable) GetGenerateID() []*Element {
 	}
 	return output
 }
+
 func (t *DefaultTable) GenerateID() map[string]string {
 	m := map[string]string{}
 	for _, e := range t.GetGenerateID() {
@@ -128,8 +130,8 @@ func (t *DefaultTable) getOrder() string {
 	}
 
 	return fmt.Sprintf(" ORDER BY %s ", strings.Join(output, ","))
-
 }
+
 func (t *DefaultTable) UpdateStatement() string {
 	var setValues []string
 	var whereValues []string

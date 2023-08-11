@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"crypto/sha1"
 	"database/sql"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"reflect"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -211,8 +215,8 @@ func (t *Table[T]) UpdateTable(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func (t *Table[T]) NamedSelect(ctx context.Context, db *sqlx.DB, query string, args interface{}) ([]*T, error) {
-	rows, err := db.NamedQueryContext(ctx, query, args)
+func (t *Table[T]) NamedSelect(ctx context.Context, db *sqlx.DB, query string, args ...interface{}) ([]*T, error) {
+	rows, err := t.NamedQuery(ctx, db, query, args)
 	if err != nil {
 		return nil, err
 	}
@@ -271,8 +275,207 @@ func (t *Table[T]) OrderByStatement(orderBy ...string) string {
 	return fmt.Sprintf("ORDER BY %s", strings.Join(orderByValues, ","))
 }
 
-func FindCommonColumns[T1 any, T2 any](t1 Table[T1], t2 Table[T2]) ([]string, []string) {
-	joinArr := []string{}
+func (t *Table[T]) IsAutoGenerateID() bool {
+	for _, e := range t.Columns {
+		if e.AutoGenerateID {
+			return true
+		}
+	}
+	return false
+}
+
+func (t *Table[T]) GetGenerateID() []*Column {
+	var output []*Column
+	for _, e := range t.Columns {
+		if e.AutoGenerateID {
+			output = append(output, e)
+		}
+	}
+	return output
+}
+
+func (t *Table[T]) GenerateID() map[string]string {
+	m := map[string]string{}
+	for _, e := range t.GetGenerateID() {
+		uid := uuid.New().String()
+		switch e.AutoGenerateIDType {
+		case "hex":
+			hasher := sha1.New()
+			hasher.Write([]byte(uid))
+			m[e.Name] = hex.EncodeToString(hasher.Sum(nil))
+		case "base64":
+			hasher := sha1.New()
+			hasher.Write([]byte(uid))
+			m[e.Name] = base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+		case "uuid":
+			fallthrough
+		default:
+			m[e.Name] = uid
+		}
+	}
+	return m
+}
+
+func (t *Table[T]) InsertStatement() string {
+	var columnNames []string
+	var values []string
+	for _, e := range t.Columns {
+		if e.Skip {
+			continue
+		}
+		columnNames = append(columnNames, e.Name)
+		values = append(values, ":"+e.Name)
+	}
+	if len(columnNames) == 0 {
+		return ""
+	}
+	insert := fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s);",
+		t.FullTableName(),
+		strings.Join(columnNames, ","), strings.Join(values, ","))
+	return insert
+}
+
+func (t *Table[T]) UpdateStatement() string {
+	var setValues []string
+	var whereValues []string
+	for _, e := range t.Columns {
+		if e.Primary {
+			whereValues = append(whereValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
+		}
+		if !e.Update {
+			continue
+		}
+		setValues = append(setValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
+	}
+	if len(setValues) == 0 {
+		return ""
+	}
+	update := fmt.Sprintf("UPDATE %s SET %s WHERE %s",
+		t.FullTableName(),
+		strings.Join(setValues, " ,"), strings.Join(whereValues, " AND "))
+	return update
+}
+
+func (t *Table[T]) DeleteStatement() string {
+	var whereValues []string
+	for _, e := range t.Columns {
+		if e.Primary {
+			whereValues = append(whereValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
+			continue
+		}
+		if e.Delete {
+			return fmt.Sprintf("DELETE FROM %s WHERE %s = :%s", t.FullTableName(), e.Name, e.Name)
+		}
+	}
+	return fmt.Sprintf("DELETE FROM %s WHERE %s", t.FullTableName(), strings.Join(whereValues, " AND "))
+}
+
+func (t *Table[T]) CountStatement(conditional string, whereElementsStr ...string) string {
+	wh := t.WhereStatement(conditional, whereElementsStr...)
+	return fmt.Sprintf("SELECT COUNT(*) as count FROM %s %s", t.FullTableName(), wh)
+}
+
+func (t *Table[T]) NamedQuery(ctx context.Context, db *sqlx.DB, query string, args ...interface{}) (*sqlx.Rows, error) {
+	a, err := combineStructs(args...)
+	if err != nil {
+		return nil, err
+	}
+	query = fixArrays(query, a)
+	return db.NamedQueryContext(ctx, query, a)
+}
+
+func SelectJoinStmt[T any](baseTable Table[T], selectCol, whereElementsStr []string, joinTables ...Table[T]) string {
+	validTables := []Table[T]{}
+	var joinStmts []string
+	whereValues := baseTable.WhereValues(whereElementsStr...)
+	for _, currentTable := range joinTables {
+		whereValues = append(whereValues, currentTable.WhereValues(whereElementsStr...)...)
+		commonColumns, _ := FindCommonColumns(baseTable, currentTable)
+		if len(commonColumns) == 0 {
+			continue
+		}
+		validTables = append(validTables, currentTable)
+		joinStmt := fmt.Sprintf(" JOIN %s ON %s", currentTable.FullTableName(), strings.Join(commonColumns, " AND "))
+		joinStmts = append(joinStmts, joinStmt)
+	}
+
+	var selectValues []string
+	dedupMap := map[string]bool{}
+	for _, validTable := range validTables {
+		if (len(selectCol) == 0) && len(selectValues) == 0 {
+			selectValues = append(selectValues, validTable.GetSelectableColumns(true)...)
+		} else {
+			for _, e := range validTable.GetSelectableColumns(true) {
+				for _, s := range selectCol {
+					if _, found := dedupMap[e]; found {
+						break
+					}
+					eleName := strings.TrimSpace(e[strings.Index(e, "AS")+2:])
+					if _, found := dedupMap[eleName]; found {
+						break
+					}
+					if strings.EqualFold(s, eleName) || strings.EqualFold(s, e) {
+						selectValues = append(selectValues, e)
+						dedupMap[eleName] = true
+						dedupMap[e] = true
+						break
+					}
+				}
+			}
+
+		}
+	}
+	var wv []string
+	dedupWhereMap := map[string]bool{}
+	for _, w := range whereValues {
+		if _, found := dedupWhereMap[w]; found {
+			continue
+		}
+		wv = append(wv, w)
+		dedupWhereMap[w] = true
+	}
+	whereStmt := ""
+	if len(wv) > 0 {
+		whereStmt = fmt.Sprintf(" WHERE %s", strings.Join(wv, " AND "))
+	}
+	strings.Join(selectValues, ",")
+	selectStmt := fmt.Sprintf("SELECT %s FROM %s %s %s", strings.Join(selectValues, ","), baseTable.FullTableName(), strings.Join(joinStmts, " "), whereStmt)
+	return selectStmt
+}
+
+func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s T) (sql.Result, string, error) {
+	if t.IsAutoGenerateID() {
+		generateIds := t.GenerateID()
+		args, err := combineStructs(generateIds, s)
+		if err != nil {
+			return nil, "", err
+		}
+		results, err := db.NamedExecContext(ctx, t.InsertStatement(), args)
+		return results, generateIds[t.GetGenerateID()[0].Name], err
+	}
+	results, err := db.NamedExecContext(ctx, t.InsertStatement(), s)
+	return results, "", err
+}
+
+func (t *Table[T]) Delete(ctx context.Context, db *sqlx.DB, s T) (sql.Result, error) {
+	return db.NamedExecContext(ctx, t.DeleteStatement(), s)
+}
+
+func (t *Table[T]) Update(ctx context.Context, db *sqlx.DB, s T) (sql.Result, error) {
+	return db.NamedExecContext(ctx, t.UpdateStatement(), s)
+}
+
+//func (t *Table[T]) SelectJoin(ctx context.Context, db *sqlx.DB, query string) {
+//	query := SelectJoinStmt[interface{}](t,selectCol, whereStr, s...)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	rows, err := d.namedQuery(ctx, query, s...)
+//}
+
+func FindCommonColumns[T any](t1 Table[T], t2 Table[T]) ([]string, []string) {
+	var joinArr []string
 	var whereValues []string
 	addedWhereValues := map[string]bool{}
 	for _, e := range t1.Columns {
