@@ -51,13 +51,13 @@ func combineStructs(i ...interface{}) (map[string]interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		output = joinMaps(output, t)
+		output = JoinMaps(output, t)
 	}
 	return output, nil
 }
 
-func joinMaps(m ...map[string]interface{}) map[string]interface{} {
-	output := map[string]interface{}{}
+func JoinMaps[T any](m ...map[string]T) map[string]T {
+	output := map[string]T{}
 	for _, currentMap := range m {
 		for k, v := range currentMap {
 			if _, found := output[k]; !found {
@@ -66,4 +66,39 @@ func joinMaps(m ...map[string]interface{}) map[string]interface{} {
 		}
 	}
 	return output
+}
+
+func WhereValues(whereElements map[string]*Column, useJoin bool) []string {
+	var whereValues []string
+	dedup := map[string]struct{}{}
+	for _, column := range whereElements {
+		tmp := column.Where
+		if useJoin {
+			tmp = column.WhereJoin
+		}
+		if useJoin && tmp == "" {
+			continue
+		}
+		if tmp == "" {
+			tmp = "="
+		}
+		if _, found := dedup[column.Name]; found {
+			continue
+		}
+		var formatted string
+		switch strings.TrimSpace(strings.ToLower(tmp)) {
+		case "not in":
+			fallthrough
+		case "in":
+			formatted = fmt.Sprintf("%s %s (:%s)", column.FullName(), tmp, column.Name)
+		default:
+			formatted = fmt.Sprintf("%s %s :%s", column.FullName(), tmp, column.Name)
+		}
+		if strings.Contains(formatted, ".") {
+			whereValues = append(whereValues, formatted)
+		}
+		dedup[column.Name] = struct{}{}
+	}
+	return whereValues
+
 }

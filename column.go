@@ -5,17 +5,20 @@ import (
 )
 
 type Column struct {
-	Name           string `json:"name"`
-	Primary        bool   `json:"primary"`
-	Skip           bool   `json:"skip"`
-	Update         bool   `json:"update"`
-	Null           bool   `json:"null"`
-	Select         bool   `json:"select"`
-	Delete         bool   `json:"delete"`
-	AutoGenerateID bool   `json:"auto_generate_id"`
-	Join           bool   `json:"join"`
-	OrderAsc       bool   `json:"order_asc"`
-	Order          bool   `json:"order"`
+	Name    string `json:"name"`
+	Table   string `json:"-"`
+	Dataset string `json:"-"`
+
+	Primary        bool `json:"primary"`
+	Skip           bool `json:"skip"`
+	Update         bool `json:"update"`
+	Null           bool `json:"null"`
+	Select         bool `json:"select"`
+	Delete         bool `json:"delete"`
+	AutoGenerateID bool `json:"auto_generate_id"`
+	Join           bool `json:"join"`
+	OrderAsc       bool `json:"order_asc"`
+	Order          bool `json:"order"`
 
 	OrderPriority int `json:"order_priority"`
 
@@ -54,6 +57,14 @@ func (c *Column) GetDefinition() string {
 
 func (c *Column) HasFK() bool {
 	return len(c.ForeignKey) > 0 && len(c.ForeignTable) > 0
+}
+
+func (c *Column) FullName() string {
+	return fmt.Sprintf("%s.%s", c.Table, c.Name)
+}
+
+func (c *Column) FullTableName() string {
+	return fmt.Sprintf("%s.%s", c.Dataset, c.Table)
 }
 
 func (c *Column) GetFK() string {

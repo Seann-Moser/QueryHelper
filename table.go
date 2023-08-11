@@ -6,8 +6,10 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -17,6 +19,10 @@ import (
 const (
 	TagConfigPrefix     = "qc"
 	TagColumnNamePrefix = "db"
+)
+
+var (
+	NoOverlappingColumnsErr = errors.New("error: no overlapping columns found")
 )
 
 type Table[T any] struct {
@@ -49,7 +55,8 @@ func NewTable[T any](databaseName string) (*Table[T], error) {
 		} else {
 			column, err = GetColumnFromTag(name, "", field.Type)
 		}
-
+		column.Table = newTable.Name
+		column.Dataset = databaseName
 		if err != nil {
 			return nil, fmt.Errorf("failed parsing struct tag info(%s):%w",
 				field.Tag.Get(TagConfigPrefix),
@@ -108,10 +115,6 @@ func (t *Table[T]) FullTableName() string {
 	return fmt.Sprintf("%s.%s", t.Dataset, t.Name)
 }
 
-func (t *Table[T]) FullColumnName(e *Column) string {
-	return fmt.Sprintf("%s.%s", t.Name, e.Name)
-}
-
 func (t *Table[T]) WhereValues(whereElementsStr ...string) []string {
 	var whereValues []string
 	for _, i := range whereElementsStr {
@@ -129,9 +132,9 @@ func (t *Table[T]) WhereValues(whereElementsStr ...string) []string {
 		case "not in":
 			fallthrough
 		case "in":
-			formatted = fmt.Sprintf("%s %s (:%s)", t.FullColumnName(column), tmp, column.Name)
+			formatted = fmt.Sprintf("%s %s (:%s)", column.FullName(), tmp, column.Name)
 		default:
-			formatted = fmt.Sprintf("%s %s :%s", t.FullColumnName(column), tmp, column.Name)
+			formatted = fmt.Sprintf("%s %s :%s", column.FullName(), tmp, column.Name)
 		}
 		if strings.Contains(formatted, ".") {
 			whereValues = append(whereValues, formatted)
@@ -245,7 +248,7 @@ func (t *Table[T]) GetSelectableColumns(useAs bool) []string {
 			suffix = ""
 		}
 		if e.Select {
-			selectValues = append(selectValues, fmt.Sprintf("%s %s", t.FullColumnName(e), suffix))
+			selectValues = append(selectValues, fmt.Sprintf("%s %s", e.FullName(), suffix))
 		}
 	}
 	return selectValues
@@ -264,14 +267,32 @@ func (t *Table[T]) WhereStatement(conditional string, whereElementsStr ...string
 
 func (t *Table[T]) OrderByStatement(orderBy ...string) string {
 	var orderByValues []string
+
+	var columns []*Column
 	for _, o := range orderBy {
 		if v, found := t.Columns[o]; found {
-			orderByValues = append(orderByValues, v.GetOrderStmt())
+			columns = append(columns, v)
+			//orderByValues = append(orderByValues, v.GetOrderStmt())
 		}
 	}
-	if len(orderByValues) == 0 {
+	if len(orderBy) == 0 {
+		for _, column := range t.Columns {
+			if column.Order {
+				columns = append(columns, column)
+			}
+		}
+	}
+	if len(columns) == 0 {
 		return ""
 	}
+
+	sort.Slice(columns, func(i, j int) bool {
+		return columns[i].OrderPriority > columns[j].OrderPriority
+	})
+	for _, column := range columns {
+		orderByValues = append(orderByValues, column.GetOrderStmt())
+	}
+
 	return fmt.Sprintf("ORDER BY %s", strings.Join(orderByValues, ","))
 }
 
@@ -384,63 +405,84 @@ func (t *Table[T]) NamedQuery(ctx context.Context, db *sqlx.DB, query string, ar
 	return db.NamedQueryContext(ctx, query, a)
 }
 
-func SelectJoinStmt[T any](baseTable Table[T], selectCol, whereElementsStr []string, joinTables ...Table[T]) string {
-	validTables := []Table[T]{}
+func (t *Table[T]) HasColumn(c *Column) (string, bool) {
+	if !c.Join && !c.Select && c.WhereJoin == "" {
+		return "", false
+	}
+	if c.Table == t.Name && c.Dataset == t.Dataset {
+		return "", false
+	}
+	for _, column := range t.Columns {
+		if c.JoinName == column.JoinName && (len(c.JoinName) > 0 && len(column.JoinName) > 0) {
+			return c.JoinName, true
+		}
+		if c.JoinName == column.Name && len(c.JoinName) > 0 {
+			return column.Name, true
+		}
+		if c.Name == column.Name {
+			return column.Name, true
+		}
+		if c.Name == column.JoinName && len(column.JoinName) > 0 {
+			return column.JoinName, true
+		}
+	}
+	return "", false
+}
+
+func (t *Table[T]) GetCommonColumns(columns map[string]*Column) map[string]*Column {
+	overlappingColumns := map[string]*Column{}
+	for k, column := range columns {
+		if _, found := t.HasColumn(column); found {
+			overlappingColumns[k] = column
+		}
+	}
+	return overlappingColumns
+}
+
+func (t *Table[T]) SelectJoinStmt(orderBy []string, tableColumns ...map[string]*Column) (string, error) {
+	overlappingColumns := map[string]*Column{}
+	allColumns := map[string]*Column{}
+	for _, columns := range tableColumns {
+		overlappingColumns = JoinMaps[*Column](overlappingColumns, t.GetCommonColumns(columns))
+		allColumns = JoinMaps[*Column](allColumns, columns)
+	}
+	if len(overlappingColumns) == 0 {
+		return "", NoOverlappingColumnsErr
+	}
+	joinStmt := t.generateJoinStmt(overlappingColumns)
+	whereStmt := t.generateWhereStmt(allColumns)
+	columns := t.GetSelectableColumns(false)
+	selectStmt := fmt.Sprintf("SELECT %s FROM %s %s %s %s", strings.Join(columns, ","), t.FullTableName(), joinStmt, whereStmt, t.OrderByStatement(orderBy...))
+	t.OrderByStatement()
+	return selectStmt, nil
+}
+
+func (t *Table[T]) generateJoinStmt(columns map[string]*Column) string {
+	if len(columns) == 0 {
+		return ""
+	}
 	var joinStmts []string
-	whereValues := baseTable.WhereValues(whereElementsStr...)
-	for _, currentTable := range joinTables {
-		whereValues = append(whereValues, currentTable.WhereValues(whereElementsStr...)...)
-		commonColumns, _ := FindCommonColumns(baseTable, currentTable)
-		if len(commonColumns) == 0 {
+	for _, column := range columns {
+		name, found := t.HasColumn(column)
+		if !column.Join || !found {
 			continue
 		}
-		validTables = append(validTables, currentTable)
-		joinStmt := fmt.Sprintf(" JOIN %s ON %s", currentTable.FullTableName(), strings.Join(commonColumns, " AND "))
+
+		joinStmt := fmt.Sprintf(" JOIN %s ON %s.%s = %s.%s", column.FullTableName(), column.Table, column.Name, t.Name, name)
 		joinStmts = append(joinStmts, joinStmt)
 	}
+	return strings.Join(joinStmts, " ")
+}
 
-	var selectValues []string
-	dedupMap := map[string]bool{}
-	for _, validTable := range validTables {
-		if (len(selectCol) == 0) && len(selectValues) == 0 {
-			selectValues = append(selectValues, validTable.GetSelectableColumns(true)...)
-		} else {
-			for _, e := range validTable.GetSelectableColumns(true) {
-				for _, s := range selectCol {
-					if _, found := dedupMap[e]; found {
-						break
-					}
-					eleName := strings.TrimSpace(e[strings.Index(e, "AS")+2:])
-					if _, found := dedupMap[eleName]; found {
-						break
-					}
-					if strings.EqualFold(s, eleName) || strings.EqualFold(s, e) {
-						selectValues = append(selectValues, e)
-						dedupMap[eleName] = true
-						dedupMap[e] = true
-						break
-					}
-				}
-			}
-
-		}
+func (t *Table[T]) generateWhereStmt(columns map[string]*Column) string {
+	if len(columns) == 0 {
+		return ""
 	}
-	var wv []string
-	dedupWhereMap := map[string]bool{}
-	for _, w := range whereValues {
-		if _, found := dedupWhereMap[w]; found {
-			continue
-		}
-		wv = append(wv, w)
-		dedupWhereMap[w] = true
+	stmts := WhereValues(columns, true)
+	if len(stmts) == 0 {
+		return ""
 	}
-	whereStmt := ""
-	if len(wv) > 0 {
-		whereStmt = fmt.Sprintf(" WHERE %s", strings.Join(wv, " AND "))
-	}
-	strings.Join(selectValues, ",")
-	selectStmt := fmt.Sprintf("SELECT %s FROM %s %s %s", strings.Join(selectValues, ","), baseTable.FullTableName(), strings.Join(joinStmts, " "), whereStmt)
-	return selectStmt
+	return fmt.Sprintf(" WHERE %s", strings.Join(stmts, " AND "))
 }
 
 func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s T) (sql.Result, string, error) {
@@ -463,46 +505,4 @@ func (t *Table[T]) Delete(ctx context.Context, db *sqlx.DB, s T) (sql.Result, er
 
 func (t *Table[T]) Update(ctx context.Context, db *sqlx.DB, s T) (sql.Result, error) {
 	return db.NamedExecContext(ctx, t.UpdateStatement(), s)
-}
-
-//func (t *Table[T]) SelectJoin(ctx context.Context, db *sqlx.DB, query string) {
-//	query := SelectJoinStmt[interface{}](t,selectCol, whereStr, s...)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	rows, err := d.namedQuery(ctx, query, s...)
-//}
-
-func FindCommonColumns[T any](t1 Table[T], t2 Table[T]) ([]string, []string) {
-	var joinArr []string
-	var whereValues []string
-	addedWhereValues := map[string]bool{}
-	for _, e := range t1.Columns {
-		columnName := e.Name
-		if e.JoinName != "" {
-			columnName = e.JoinName
-		}
-		if !e.Join {
-			continue
-		}
-		for _, e2 := range t2.Columns {
-			e2ColName := e2.Name
-			if e2.JoinName != "" {
-				e2ColName = e2.JoinName
-			}
-			if strings.EqualFold(e2ColName, columnName) && e2.Join {
-				joinArr = append(joinArr, fmt.Sprintf("%s = %s",
-					t2.FullColumnName(e2),
-					t1.FullColumnName(e),
-				))
-			} else {
-				if _, found := addedWhereValues[e2.Name]; !found && len(e2.Where) > 0 && !e2.Join {
-					addedWhereValues[e2.Name] = true
-					whereValues = append(whereValues, fmt.Sprintf("%s %s :%s", t2.FullColumnName(e2), e2.Where, e2.Name))
-				}
-			}
-		}
-	}
-	return joinArr, whereValues
 }
