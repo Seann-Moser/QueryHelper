@@ -34,7 +34,7 @@ where,join_name,data_type,default, where_join,foreign_key,foreign_table,order,au
 ### Examples
 
 ```go
-package query_helper
+package QueryHelper
 
 import (
     "context"
