@@ -1,4 +1,4 @@
-package query_helper
+package QueryHelper
 
 import (
 	"encoding/json"
