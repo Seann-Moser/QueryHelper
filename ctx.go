@@ -16,7 +16,7 @@ type tableCtxName string
 func AddTableCtx[T any](ctx context.Context, db *sqlx.DB, dataset string, dropTable, updateColumns bool) (context.Context, error) {
 	table, err := NewTable[T](dataset)
 	if err != nil {
-		return nil, nil
+		return ctx, err
 	}
 
 	err = table.InitializeTable(ctx, db, dropTable, updateColumns)
