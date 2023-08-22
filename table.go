@@ -58,13 +58,14 @@ func NewTable[T any](databaseName string) (*Table[T], error) {
 		} else {
 			column, err = GetColumnFromTag(name, "", field.Type)
 		}
-		column.Table = newTable.Name
-		column.Dataset = databaseName
+
 		if err != nil {
 			return nil, fmt.Errorf("failed parsing struct tag info(%s):%w",
 				field.Tag.Get(TagConfigPrefix),
 				err)
 		}
+		column.Table = newTable.Name
+		column.Dataset = databaseName
 
 		if column.Primary {
 			setPrimary = true
