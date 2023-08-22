@@ -120,7 +120,7 @@ func (t *Table[T]) CreateMySqlTableStatement(dropTable bool) ([]string, error) {
 	}
 
 	sort.Slice(columns, func(i, j int) bool {
-		return columns[i].ColumnOrder > columns[j].ColumnOrder
+		return columns[i].ColumnOrder < columns[j].ColumnOrder
 	})
 
 	for _, column := range columns {
@@ -353,7 +353,7 @@ func (t *Table[T]) OrderByStatement(orderBy ...string) string {
 	}
 
 	sort.Slice(columns, func(i, j int) bool {
-		return columns[i].OrderPriority > columns[j].OrderPriority
+		return columns[i].OrderPriority < columns[j].OrderPriority
 	})
 	for _, column := range columns {
 		orderByValues = append(orderByValues, column.GetOrderStmt())
