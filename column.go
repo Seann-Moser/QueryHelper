@@ -5,9 +5,10 @@ import (
 )
 
 type Column struct {
-	Name    string `json:"name"`
-	Table   string `json:"-"`
-	Dataset string `json:"-"`
+	Name        string `json:"name"`
+	Table       string `json:"-"`
+	Dataset     string `json:"-"`
+	ColumnOrder int    `json:"-"`
 
 	Primary        bool `json:"primary"`
 	Skip           bool `json:"skip"`
