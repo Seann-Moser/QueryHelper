@@ -64,6 +64,7 @@ func NewTable[T any](databaseName string) (*Table[T], error) {
 				field.Tag.Get(TagConfigPrefix),
 				err)
 		}
+		column.ColumnOrder = i
 		column.Table = newTable.Name
 		column.Dataset = databaseName
 
@@ -112,7 +113,17 @@ func (t *Table[T]) CreateMySqlTableStatement(dropTable bool) ([]string, error) {
 	}
 	createStatement += fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s(", t.FullTableName())
 
+	var columns []*Column
+
 	for _, column := range t.Columns {
+		columns = append(columns, column)
+	}
+
+	sort.Slice(columns, func(i, j int) bool {
+		return columns[i].ColumnOrder > columns[j].ColumnOrder
+	})
+
+	for _, column := range columns {
 		createStatement += column.GetDefinition() + ","
 		if column.HasFK() {
 			FK = append(FK, column.GetFK())
