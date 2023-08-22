@@ -1,4 +1,4 @@
-package main
+package query_helper
 
 import (
 	"fmt"
