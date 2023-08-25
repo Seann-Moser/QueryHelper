@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -24,6 +25,8 @@ const (
 var (
 	NoOverlappingColumnsErr = errors.New("error: no overlapping columns found")
 	MissingPrimaryKeyErr    = errors.New("no field was set as the primary key")
+	matchFirstCap           = regexp.MustCompile("(.)([A-Z][a-z]+)")
+	matchAllCap             = regexp.MustCompile("([a-z0-9])([A-Z])")
 )
 
 type Table[T any] struct {
@@ -39,7 +42,7 @@ func NewTable[T any](databaseName string) (*Table[T], error) {
 	var s T
 	newTable := Table[T]{
 		Dataset: databaseName,
-		Name:    getType(s),
+		Name:    ToSnakeCase(getType(s)),
 		Columns: map[string]*Column{},
 	}
 
@@ -80,6 +83,12 @@ func NewTable[T any](databaseName string) (*Table[T], error) {
 		return nil, MissingPrimaryKeyErr
 	}
 	return &newTable, nil
+}
+
+func ToSnakeCase(str string) string {
+	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
+	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
+	return strings.ToLower(snake)
 }
 
 func (t *Table[T]) InitializeTable(ctx context.Context, db *sqlx.DB, dropTable, updateTable bool) error {
