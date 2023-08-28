@@ -3,6 +3,7 @@ package QueryHelper
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -10,6 +11,16 @@ func safeString(d interface{}) string {
 	switch v := d.(type) {
 	case string:
 		return v
+	case int64:
+		return strconv.Itoa(int(v))
+	case int:
+		return strconv.Itoa(int(v))
+	case int32:
+		return strconv.Itoa(int(v))
+	case float32, float64:
+		return fmt.Sprintf("%d", v)
+	case bool:
+		return strconv.FormatBool(v)
 	}
 	return ""
 }
@@ -45,7 +56,10 @@ func getKeys(i ...interface{}) ([]string, error) {
 		return nil, err
 	}
 	var output []string
-	for k, _ := range m {
+	for k, v := range m {
+		if v == nil || safeString(v) == "" {
+			continue
+		}
 		output = append(output, k)
 	}
 	return output, nil
