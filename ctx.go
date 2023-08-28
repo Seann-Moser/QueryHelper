@@ -29,7 +29,7 @@ func AddTableCtx[T any](ctx context.Context, db *sqlx.DB, dataset string, dropTa
 
 func GetTableCtx[T any](ctx context.Context) (*Table[T], error) {
 	var s T
-	name := getType(s)
+	name := ToSnakeCase(getType(s))
 
 	value := ctx.Value(tableCtxName(name))
 	if value == nil {
