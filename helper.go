@@ -39,6 +39,18 @@ func fixArrays(query string, args map[string]interface{}) string {
 	return query
 }
 
+func getKeys(i ...interface{}) ([]string, error) {
+	m, err := combineStructs(i...)
+	if err != nil {
+		return nil, err
+	}
+	var output []string
+	for k, _ := range m {
+		output = append(output, k)
+	}
+	return output, nil
+}
+
 func combineStructs(i ...interface{}) (map[string]interface{}, error) {
 	output := map[string]interface{}{}
 	for _, s := range i {

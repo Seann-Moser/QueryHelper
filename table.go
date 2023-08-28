@@ -274,10 +274,13 @@ func (t *Table[T]) UpdateTable(ctx context.Context, db *sqlx.DB) error {
 
 func (t *Table[T]) Select(ctx context.Context, db *sqlx.DB, args ...interface{}) ([]*T, error) {
 	query := fmt.Sprintf("SELECT %s FROM %s", strings.Join(t.GetSelectableColumns(false), ","), t.FullTableName())
+	keys, err := getKeys(args...)
+	if err != nil {
+		return nil, err
+	}
 
-	values := WhereValues(t.Columns, false)
-	if len(values) > 0 {
-		query = fmt.Sprintf("%s WHERE %s", query, strings.Join(values, " AND "))
+	if len(keys) > 0 {
+		query = fmt.Sprintf("%s %s", query, t.WhereStatement("AND", keys...))
 	}
 
 	order := t.OrderByStatement()
@@ -286,7 +289,6 @@ func (t *Table[T]) Select(ctx context.Context, db *sqlx.DB, args ...interface{})
 	}
 	return t.NamedSelect(ctx, db, query, args...)
 }
-
 func (t *Table[T]) NamedSelect(ctx context.Context, db *sqlx.DB, query string, args ...interface{}) ([]*T, error) {
 	if db == nil {
 		db = t.db
@@ -318,12 +320,12 @@ func (t *Table[T]) GetSelectableColumns(useAs bool) []string {
 	var suffix string
 	for _, e := range t.Columns {
 		if useAs {
-			suffix = fmt.Sprintf("AS %s", e.Name)
+			suffix = fmt.Sprintf(" AS %s", e.Name)
 		} else {
 			suffix = ""
 		}
 		if e.Select {
-			selectValues = append(selectValues, fmt.Sprintf("%s %s", e.FullName(), suffix))
+			selectValues = append(selectValues, fmt.Sprintf("%s%s", e.FullName(), suffix))
 		}
 	}
 	return selectValues
