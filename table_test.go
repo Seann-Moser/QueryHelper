@@ -65,5 +65,5 @@ func TestTableCtx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	println(table.Select(ctx, nil))
+	println(table.Select(ctx, nil, "AND"))
 }

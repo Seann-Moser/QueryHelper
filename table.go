@@ -272,7 +272,7 @@ func (t *Table[T]) UpdateTable(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func (t *Table[T]) Select(ctx context.Context, db *sqlx.DB, args ...interface{}) ([]*T, error) {
+func (t *Table[T]) Select(ctx context.Context, db *sqlx.DB, conditional string, args ...interface{}) ([]*T, error) {
 	query := fmt.Sprintf("SELECT %s FROM %s", strings.Join(t.GetSelectableColumns(false), ","), t.FullTableName())
 	keys, err := getKeys(args...)
 	if err != nil {
@@ -280,7 +280,7 @@ func (t *Table[T]) Select(ctx context.Context, db *sqlx.DB, args ...interface{})
 	}
 
 	if len(keys) > 0 {
-		query = fmt.Sprintf("%s %s", query, t.WhereStatement("AND", keys...))
+		query = fmt.Sprintf("%s %s", query, t.WhereStatement(strings.ToUpper(conditional), keys...))
 	}
 
 	order := t.OrderByStatement()
