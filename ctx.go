@@ -37,3 +37,15 @@ func GetTableCtx[T any](ctx context.Context) (*Table[T], error) {
 	}
 	return value.(*Table[T]), nil
 }
+
+func WithTableContext(baseCtx context.Context, tableCtx context.Context, names ...string) (context.Context, error) {
+	for _, name := range names {
+		value := tableCtx.Value(tableCtxName(name))
+		if value == nil {
+			return nil, ErrTableNotInCtx
+		}
+		baseCtx = context.WithValue(baseCtx, tableCtxName(name), value)
+
+	}
+	return baseCtx, nil
+}
