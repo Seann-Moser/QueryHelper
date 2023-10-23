@@ -522,7 +522,7 @@ func (t *Table[T]) GetCommonColumns(columns map[string]*Column) map[string]*Colu
 	return overlappingColumns
 }
 
-func (t *Table[T]) SelectJoinStmt(orderBy []string, tableColumns ...map[string]*Column) (string, error) {
+func (t *Table[T]) SelectJoinStmt(JoinType string, orderBy []string, tableColumns ...map[string]*Column) (string, error) {
 	overlappingColumns := map[string]*Column{}
 	allColumns := map[string]*Column{}
 	for _, columns := range tableColumns {
@@ -532,7 +532,7 @@ func (t *Table[T]) SelectJoinStmt(orderBy []string, tableColumns ...map[string]*
 	if len(overlappingColumns) == 0 {
 		return "", NoOverlappingColumnsErr
 	}
-	joinStmt := t.generateJoinStmt(overlappingColumns)
+	joinStmt := t.generateJoinStmt(overlappingColumns, JoinType)
 	whereStmt := t.generateWhereStmt(allColumns)
 	columns := t.GetSelectableColumns(false)
 	selectStmt := fmt.Sprintf("SELECT %s FROM %s %s %s %s", strings.Join(columns, ","), t.FullTableName(), joinStmt, whereStmt, t.OrderByStatement(orderBy...))
@@ -540,18 +540,25 @@ func (t *Table[T]) SelectJoinStmt(orderBy []string, tableColumns ...map[string]*
 	return selectStmt, nil
 }
 
-func (t *Table[T]) generateJoinStmt(columns map[string]*Column) string {
+func (t *Table[T]) generateJoinStmt(columns map[string]*Column, JoinType string) string {
 	if len(columns) == 0 {
 		return ""
 	}
 	var joinStmts []string
+	joinExp := "JOIN"
+	switch strings.ToLower(JoinType) {
+	case "left":
+		joinExp = "LEFT JOIN"
+	case "right":
+		joinExp = "RIGHT JOIN"
+	}
 	for _, column := range columns {
 		name, found := t.HasColumn(column)
 		if !column.Join || !found {
 			continue
 		}
 
-		joinStmt := fmt.Sprintf(" JOIN %s ON %s.%s = %s.%s", column.FullTableName(), column.Table, column.Name, t.Name, name)
+		joinStmt := fmt.Sprintf(" %s %s ON %s.%s = %s.%s", joinExp, column.FullTableName(), column.Table, column.Name, t.Name, name)
 		joinStmts = append(joinStmts, joinStmt)
 	}
 	return strings.Join(joinStmts, " ")

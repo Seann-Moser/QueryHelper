@@ -49,7 +49,7 @@ func TestTableJoin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sql, err := fullTable.SelectJoinStmt(nil, GuestRequestsTable.Columns)
+	sql, err := fullTable.SelectJoinStmt("", nil, GuestRequestsTable.Columns)
 	if err != nil {
 		t.Fatal(err)
 	}
