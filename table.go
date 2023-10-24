@@ -671,3 +671,15 @@ func (t *Table[T]) Update(ctx context.Context, db *sqlx.DB, s T) (sql.Result, er
 	}
 	return db.NamedExecContext(ctx, t.UpdateStatement(), s)
 }
+
+func NamedQuery(ctx context.Context, db *sqlx.DB, query string, args ...interface{}) (*sqlx.Rows, error) {
+	if db == nil {
+		return nil, nil
+	}
+	a, err := combineStructs(args...)
+	if err != nil {
+		return nil, err
+	}
+	query = fixArrays(query, a)
+	return db.NamedQueryContext(ctx, query, a)
+}

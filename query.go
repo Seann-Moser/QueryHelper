@@ -2,6 +2,7 @@ package QueryHelper
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -213,6 +214,10 @@ func (q *Query[T]) Run(ctx context.Context, db *sqlx.DB, args ...interface{}) ([
 	if len(q.Query) == 0 {
 		q.Build()
 	}
+	return q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
+}
+
+func (q *Query[T]) Args(args ...interface{}) map[string]interface{} {
 	whereArgs := map[string]interface{}{}
 	for _, where := range q.WhereStmts {
 		if where.RightValue == nil {
@@ -220,5 +225,35 @@ func (q *Query[T]) Run(ctx context.Context, db *sqlx.DB, args ...interface{}) ([
 		}
 		whereArgs[where.LeftValue.Name] = where.RightValue
 	}
-	return q.FromTable.NamedSelect(ctx, db, q.Query, append(args, whereArgs)...)
+	arg, err := combineStructs(append(args, whereArgs)...)
+	if err != nil {
+		return nil
+	}
+	return arg
+}
+
+func SelectQuery[T any, X any](ctx context.Context, db *sqlx.DB, q *Query[T], args ...interface{}) ([]*X, error) {
+	if len(q.Query) == 0 {
+		q.Build()
+	}
+	if db == nil {
+		db = q.FromTable.db
+	}
+	rows, err := NamedQuery(ctx, db, q.Query, q.Args(args...))
+	if err != nil {
+		return nil, err
+	}
+	if rows == nil {
+		return nil, sql.ErrNoRows
+	}
+	var output []*X
+	for rows.Next() {
+		var tmp X
+		err := rows.StructScan(&tmp)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, &tmp)
+	}
+	return output, nil
 }
