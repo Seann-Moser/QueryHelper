@@ -466,7 +466,7 @@ func (t *Table[T]) GenerateID() map[string]string {
 	return m
 }
 
-func (t *Table[T]) InsertStatement() string {
+func (t *Table[T]) InsertStatement(amount int) string {
 	var columnNames []string
 	var values []string
 	for _, e := range t.Columns {
@@ -479,9 +479,14 @@ func (t *Table[T]) InsertStatement() string {
 	if len(columnNames) == 0 {
 		return ""
 	}
-	insert := fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s);",
+	var rows []string
+	for i := 0; i < amount; i++ {
+		rows = append(rows, fmt.Sprintf("(%s)", strings.Join(values, ",")))
+	}
+
+	insert := fmt.Sprintf("INSERT INTO %s(%s) VALUES \n%s;",
 		t.FullTableName(),
-		strings.Join(columnNames, ","), strings.Join(values, ","))
+		strings.Join(columnNames, ","), strings.Join(rows, ","))
 	return insert
 }
 
@@ -627,7 +632,7 @@ func (t *Table[T]) generateWhereStmt(columns map[string]*Column) string {
 	return fmt.Sprintf(" WHERE %s", strings.Join(stmts, " AND "))
 }
 
-func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s T) (sql.Result, string, error) {
+func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s ...T) (sql.Result, string, error) {
 	if db == nil {
 		db = t.db
 	}
@@ -640,10 +645,10 @@ func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s T) (sql.Result, st
 		if err != nil {
 			return nil, "", err
 		}
-		results, err := db.NamedExecContext(ctx, t.InsertStatement(), args)
+		results, err := db.NamedExecContext(ctx, t.InsertStatement(len(s)), args)
 		return results, generateIds[t.GetGenerateID()[0].Name], err
 	}
-	results, err := db.NamedExecContext(ctx, t.InsertStatement(), s)
+	results, err := db.NamedExecContext(ctx, t.InsertStatement(len(s)), s)
 	return results, "", err
 }
 

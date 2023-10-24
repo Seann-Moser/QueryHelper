@@ -81,8 +81,6 @@ func generateWhere(whereStatements []*WhereStmt) string {
 	}
 	if previousLevel > 0 {
 		stmt += fmt.Sprintf(" %s", generateList(")", previousLevel))
-	} else if previousLevel < 0 {
-		stmt += fmt.Sprintf(" %s", generateList("(", previousLevel*-1))
 	}
 	return "WHERE " + stmt
 }
@@ -131,6 +129,9 @@ func (q *Query[T]) Join(tableColumns map[string]*Column) *Query[T] {
 }
 
 func (q *Query[T]) Where(column *Column, conditional, joinOperator string, level int, value interface{}) *Query[T] {
+	if level < 0 {
+		level = 0
+	}
 	q.WhereStmts = append(q.WhereStmts, &WhereStmt{
 		LeftValue:    column,
 		Conditional:  conditional,
@@ -162,13 +163,20 @@ func (q *Query[T]) Build() *Query[T] {
 	var query = ""
 	selectColumns := q.FromTable.GetSelectableColumns(isGroupBy, isGroupBy, q.SelectColumns...)
 
+	if q.FromQuery != nil {
+		q.FromQuery.Build()
+		query = fmt.Sprintf("SELECT\n\t%s\nFROM\n\t(%s)", strings.Join(selectColumns, ",\n\t"), strings.ReplaceAll(q.FromQuery.Query, "\n", "\n\t"))
+
+	} else {
+		query = fmt.Sprintf("SELECT\n\t%s\nFROM\n\t%s", strings.Join(selectColumns, ",\n\t"), q.FromTable.FullTableName())
+
+	}
+
 	//whereStmt := q.FromTable.  (strings.ToUpper(conditional), keys...)
 	// build sub query
 	//gnereate group by
 
 	//generate order by
-
-	query = fmt.Sprintf("SELECT\n\t%s\nFROM\n\t%s", strings.Join(selectColumns, ",\n\t"), q.FromTable.FullTableName())
 
 	if len(q.JoinStmt) > 0 {
 		//q.FromTable.generateJoinStmt(q.JoinStmt,"")
