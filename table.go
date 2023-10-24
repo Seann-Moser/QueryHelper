@@ -177,9 +177,9 @@ func (t *Table[T]) WhereValues(whereElementsStr ...string) []string {
 		case "not in":
 			fallthrough
 		case "in":
-			formatted = fmt.Sprintf("%s %s (:%s)", column.FullName(), tmp, column.Name)
+			formatted = fmt.Sprintf("%s %s (:%s)", column.FullName(false), tmp, column.Name)
 		default:
-			formatted = fmt.Sprintf("%s %s :%s", column.FullName(), tmp, column.Name)
+			formatted = fmt.Sprintf("%s %s :%s", column.FullName(false), tmp, column.Name)
 		}
 		if strings.Contains(formatted, ".") {
 			whereValues = append(whereValues, formatted)
@@ -272,8 +272,8 @@ func (t *Table[T]) UpdateTable(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func (t *Table[T]) Select(ctx context.Context, db *sqlx.DB, conditional string, args ...interface{}) ([]*T, error) {
-	query := fmt.Sprintf("SELECT %s FROM %s", strings.Join(t.GetSelectableColumns(false), ","), t.FullTableName())
+func (t *Table[T]) Select(ctx context.Context, db *sqlx.DB, conditional string, groupBy bool, args ...interface{}) ([]*T, error) {
+	query := fmt.Sprintf("SELECT %s FROM %s", strings.Join(t.GetSelectableColumns(false, groupBy), ","), t.FullTableName())
 	keys, err := getKeys(args...)
 	if err != nil {
 		return nil, err
@@ -315,17 +315,37 @@ func (t *Table[T]) NamedSelect(ctx context.Context, db *sqlx.DB, query string, a
 	return output, nil
 }
 
-func (t *Table[T]) GetSelectableColumns(useAs bool) []string {
+func (t *Table[T]) GetSelectableColumns(useAs bool, groupBy bool, names ...*Column) []string {
 	var selectValues []string
 	var suffix string
+	if len(names) > 0 {
+		for _, name := range names {
+			e, found := t.Columns[name.Name]
+			if !found {
+				continue
+			}
+			if useAs {
+				suffix = fmt.Sprintf(" AS %s", e.Name)
+			} else {
+				suffix = ""
+			}
+
+			if e.Select {
+				selectValues = append(selectValues, fmt.Sprintf("%s%s", e.FullName(groupBy), suffix))
+			}
+		}
+		return selectValues
+	}
+
 	for _, e := range t.Columns {
 		if useAs {
 			suffix = fmt.Sprintf(" AS %s", e.Name)
 		} else {
 			suffix = ""
 		}
+
 		if e.Select {
-			selectValues = append(selectValues, fmt.Sprintf("%s%s", e.FullName(), suffix))
+			selectValues = append(selectValues, fmt.Sprintf("%s%s", e.FullName(groupBy), suffix))
 		}
 	}
 	return selectValues
@@ -522,7 +542,7 @@ func (t *Table[T]) GetCommonColumns(columns map[string]*Column) map[string]*Colu
 	return overlappingColumns
 }
 
-func (t *Table[T]) SelectJoinStmt(JoinType string, orderBy []string, tableColumns ...map[string]*Column) (string, error) {
+func (t *Table[T]) SelectJoinStmt(JoinType string, orderBy []string, groupBy bool, tableColumns ...map[string]*Column) (string, error) {
 	overlappingColumns := map[string]*Column{}
 	allColumns := map[string]*Column{}
 	for _, columns := range tableColumns {
@@ -534,7 +554,7 @@ func (t *Table[T]) SelectJoinStmt(JoinType string, orderBy []string, tableColumn
 	}
 	joinStmt := t.generateJoinStmt(overlappingColumns, JoinType)
 	whereStmt := t.generateWhereStmt(allColumns)
-	columns := t.GetSelectableColumns(false)
+	columns := t.GetSelectableColumns(false, groupBy)
 	selectStmt := fmt.Sprintf("SELECT %s FROM %s %s %s %s", strings.Join(columns, ","), t.FullTableName(), joinStmt, whereStmt, t.OrderByStatement(orderBy...))
 	t.OrderByStatement()
 	return selectStmt, nil

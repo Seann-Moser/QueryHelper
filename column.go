@@ -21,7 +21,9 @@ type Column struct {
 	OrderAsc       bool `json:"order_asc"`
 	Order          bool `json:"order"`
 
-	OrderPriority int `json:"order_priority"`
+	GroupByModifier string `json:"group_by_modifier"`
+	GroupByColumn   bool   `json:"group_by_column"`
+	OrderPriority   int    `json:"order_priority"`
 
 	Type    string `json:"data_type"`
 	Default string `json:"default"`
@@ -60,7 +62,11 @@ func (c *Column) HasFK() bool {
 	return len(c.ForeignKey) > 0 && len(c.ForeignTable) > 0
 }
 
-func (c *Column) FullName() string {
+func (c *Column) FullName(groupBy bool) string {
+	if groupBy && len(c.GroupByModifier) > 0 {
+		return fmt.Sprintf("%s(%s.%s)", c.GroupByModifier, c.Table, c.Name)
+	}
+
 	return fmt.Sprintf("%s.%s", c.Table, c.Name)
 }
 
