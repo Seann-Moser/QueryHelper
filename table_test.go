@@ -43,6 +43,7 @@ func TestNewTable(t *testing.T) {
 
 	query = QueryTable[FullTestStruct](table).Select(table.GetColumn("book_id"), table.GetColumn("number")).Where(table.GetColumn("chapter_id"), "in", "", 2, nil).Where(table.GetColumn("language"), "=", "", 1, nil).GroupBy(table.GetColumn("book_id")).Build()
 	println(query.Query)
+
 }
 
 func TestTableJoin(t *testing.T) {
@@ -61,6 +62,15 @@ func TestTableJoin(t *testing.T) {
 		t.Fatal(err)
 	}
 	println(sql)
+
+	query := QueryTable[FullTestStruct](fullTable).
+		//Select(fullTable.GetColumn("book_id"), fullTable.GetColumn("number")).
+		Join(GuestRequestsTable.Columns, "LEFT").
+		Where(fullTable.GetColumn("chapter_id"), "in", "", 2, nil).
+		Where(fullTable.GetColumn("language"), "=", "", 1, nil).
+		GroupBy(fullTable.GetColumn("book_id")).
+		Build()
+	println(query.Query)
 }
 
 func TestTableCtx(t *testing.T) {

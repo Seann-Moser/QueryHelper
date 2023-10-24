@@ -1,6 +1,7 @@
 package QueryHelper
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -127,4 +128,64 @@ func WhereValues(whereElements map[string]*Column, useJoin bool) []string {
 	}
 	return whereValues
 
+}
+
+type NullString struct {
+	sql.NullString
+}
+
+func (r NullString) MarshalJSON() ([]byte, error) {
+	if r.Valid {
+		return json.Marshal(r.String)
+	} else {
+		return json.Marshal(nil)
+	}
+}
+
+type NullInt64 struct {
+	sql.NullInt64
+}
+
+func (r NullInt64) MarshalJSON() ([]byte, error) {
+	if r.Valid {
+		return json.Marshal(r.Int64)
+	} else {
+		return json.Marshal(nil)
+	}
+}
+
+type NullBool struct {
+	sql.NullBool
+}
+
+func (r NullBool) MarshalJSON() ([]byte, error) {
+	if r.Valid {
+		return json.Marshal(r.Bool)
+	} else {
+		return json.Marshal(nil)
+	}
+}
+
+type NullFloat64 struct {
+	sql.NullFloat64
+}
+
+func (r NullFloat64) MarshalJSON() ([]byte, error) {
+	if r.Valid {
+		return json.Marshal(r.Float64)
+	} else {
+		return json.Marshal(nil)
+	}
+}
+
+type NullTime struct {
+	sql.NullTime
+}
+
+func (r NullTime) MarshalJSON() ([]byte, error) {
+	if r.Valid {
+		return json.Marshal(r.Time)
+	} else {
+		return json.Marshal(nil)
+	}
 }

@@ -12,7 +12,7 @@ type Query[T any] struct {
 	SelectColumns []*Column
 	FromTable     *Table[T]
 	FromQuery     *Query[T]
-	JoinStmt      []map[string]*Column
+	JoinStmt      []*JoinStmt
 	WhereStmts    []*WhereStmt
 	GroupByStmt   []*Column
 	OrderByStmt   []*Column
@@ -22,6 +22,10 @@ type Query[T any] struct {
 	Query string
 }
 
+type JoinStmt struct {
+	Columns  map[string]*Column
+	JoinType string
+}
 type WhereStmt struct {
 	LeftValue    *Column
 	Conditional  string
@@ -106,7 +110,7 @@ func QueryTable[T any](table *Table[T]) *Query[T] {
 		SelectColumns: []*Column{},
 		FromTable:     table,
 		FromQuery:     nil,
-		JoinStmt:      make([]map[string]*Column, 0),
+		JoinStmt:      make([]*JoinStmt, 0),
 		WhereStmts:    make([]*WhereStmt, 0),
 		GroupByStmt:   make([]*Column, 0),
 		OrderByStmt:   make([]*Column, 0),
@@ -123,8 +127,11 @@ func (q *Query[T]) From(query *Query[T]) *Query[T] {
 	return q
 }
 
-func (q *Query[T]) Join(tableColumns map[string]*Column) *Query[T] {
-	q.JoinStmt = append(q.JoinStmt, tableColumns)
+func (q *Query[T]) Join(tableColumns map[string]*Column, joinType string) *Query[T] {
+	q.JoinStmt = append(q.JoinStmt, &JoinStmt{
+		Columns:  tableColumns,
+		JoinType: joinType,
+	})
 	return q
 }
 
@@ -172,14 +179,15 @@ func (q *Query[T]) Build() *Query[T] {
 
 	}
 
-	//whereStmt := q.FromTable.  (strings.ToUpper(conditional), keys...)
-	// build sub query
-	//gnereate group by
-
-	//generate order by
-
 	if len(q.JoinStmt) > 0 {
-		//q.FromTable.generateJoinStmt(q.JoinStmt,"")
+		for _, join := range q.JoinStmt {
+			overlappingColumns := map[string]*Column{}
+			overlappingColumns = JoinMaps[*Column](overlappingColumns, q.FromTable.GetCommonColumns(join.Columns))
+			if len(overlappingColumns) == 0 {
+				continue
+			}
+			query = fmt.Sprintf("%s\n%s", query, q.FromTable.generateJoinStmt(overlappingColumns, join.JoinType))
+		}
 	}
 
 	if len(q.WhereStmts) > 0 {

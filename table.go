@@ -615,7 +615,7 @@ func (t *Table[T]) generateJoinStmt(columns map[string]*Column, JoinType string)
 			continue
 		}
 
-		joinStmt := fmt.Sprintf(" %s %s ON %s.%s = %s.%s", joinExp, column.FullTableName(), column.Table, column.Name, t.Name, name)
+		joinStmt := fmt.Sprintf("%s %s ON %s.%s = %s.%s", joinExp, column.FullTableName(), column.Table, column.Name, t.Name, name)
 		joinStmts = append(joinStmts, joinStmt)
 	}
 	return strings.Join(joinStmts, " ")
