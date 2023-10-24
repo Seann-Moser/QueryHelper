@@ -91,6 +91,12 @@ func ToSnakeCase(str string) string {
 	return strings.ToLower(snake)
 }
 
+func (t *Table[T]) GetColumn(name string) *Column {
+	if column, found := t.Columns[ToSnakeCase(name)]; found {
+		return column
+	}
+	return nil
+}
 func (t *Table[T]) InitializeTable(ctx context.Context, db *sqlx.DB, dropTable, updateTable bool) error {
 	stmts, err := t.CreateMySqlTableStatement(dropTable)
 	if err != nil {
@@ -320,6 +326,9 @@ func (t *Table[T]) GetSelectableColumns(useAs bool, groupBy bool, names ...*Colu
 	var suffix string
 	if len(names) > 0 {
 		for _, name := range names {
+			if name == nil {
+				continue
+			}
 			e, found := t.Columns[name.Name]
 			if !found {
 				continue

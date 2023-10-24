@@ -24,7 +24,7 @@ func GetColumnFromTag(name, data string, p reflect.Type) (*Column, error) {
 	con := map[string]interface{}{}
 	con["select"] = true
 	con["data_type"] = convertTypeToSql(name, p)
-	con["name"] = name
+	con["name"] = ToSnakeCase(name)
 	for _, row := range dataPoints {
 		v := strings.Split(row, EqualSplit)
 		key := strings.TrimSpace(v[0])

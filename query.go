@@ -23,20 +23,84 @@ type Query[T any] struct {
 }
 
 type WhereStmt struct {
-	LeftValue   string
-	Conditional string
-	RightValue  interface{}
-	Level       int
+	LeftValue    *Column
+	Conditional  string
+	RightValue   interface{}
+	Level        int
+	JoinOperator string
 }
 
-func generateWhere(whereStatments []*WhereStmt) string {
+func (w *WhereStmt) ToString() string {
+	column := w.LeftValue
 
+	tmp := column.Where
+	if w.Conditional != "" {
+		tmp = w.Conditional
+	} else if tmp == "" {
+		tmp = "="
+	}
+	var formatted string
+	switch strings.TrimSpace(strings.ToLower(tmp)) {
+	case "not in":
+		fallthrough
+	case "in":
+		formatted = fmt.Sprintf("%s %s (:%s)", column.FullName(false), tmp, column.Name)
+	default:
+		formatted = fmt.Sprintf("%s %s :%s", column.FullName(false), tmp, column.Name)
+	}
+	if strings.Contains(formatted, ".") {
+		return formatted
+	}
 	return ""
+}
+
+func generateWhere(whereStatements []*WhereStmt) string {
+	previousLevel := 0
+	stmt := ""
+	for i, w := range whereStatements {
+		if where := w.ToString(); where != "" {
+
+			if w.Level > previousLevel {
+				stmt += fmt.Sprintf(" %s", generateList("(", w.Level-previousLevel))
+			}
+			if w.Level < previousLevel {
+				stmt += fmt.Sprintf(" %s", generateList(")", previousLevel-w.Level))
+			}
+
+			if i > 0 {
+				if w.JoinOperator == "" {
+					w.JoinOperator = "AND"
+				}
+				stmt += " " + strings.ToUpper(w.JoinOperator)
+			}
+
+			stmt += fmt.Sprintf(" %s", w.ToString())
+			previousLevel = w.Level
+
+		}
+	}
+	if previousLevel > 0 {
+		stmt += fmt.Sprintf(" %s", generateList(")", previousLevel))
+	} else if previousLevel < 0 {
+		stmt += fmt.Sprintf(" %s", generateList("(", previousLevel*-1))
+	}
+	return "WHERE " + stmt
+}
+
+func generateList(symbol string, count int) string {
+	output := ""
+	for i := 0; i < count; i++ {
+		output += symbol
+	}
+	return output
 }
 
 func generateGroupBy(groupBy []*Column) string {
-
-	return ""
+	var columns []string
+	for _, c := range groupBy {
+		columns = append(columns, c.FullName(false))
+	}
+	return "GROUP BY " + strings.Join(columns, ",")
 }
 
 func QueryTable[T any](table *Table[T]) *Query[T] {
@@ -61,17 +125,18 @@ func (q *Query[T]) From(query *Query[T]) *Query[T] {
 	return q
 }
 
-func (q *Query[T]) Join(tableColumns ...map[string]*Column) *Query[T] {
-	q.JoinStmt = append(q.JoinStmt, tableColumns...)
+func (q *Query[T]) Join(tableColumns map[string]*Column) *Query[T] {
+	q.JoinStmt = append(q.JoinStmt, tableColumns)
 	return q
 }
 
-func (q *Query[T]) Where(key string, conditional string, level int, value interface{}) *Query[T] {
+func (q *Query[T]) Where(column *Column, conditional, joinOperator string, level int, value interface{}) *Query[T] {
 	q.WhereStmts = append(q.WhereStmts, &WhereStmt{
-		LeftValue:   key,
-		Conditional: conditional,
-		RightValue:  value,
-		Level:       level,
+		LeftValue:    column,
+		Conditional:  conditional,
+		RightValue:   value,
+		Level:        level,
+		JoinOperator: joinOperator,
 	})
 
 	return q
@@ -103,7 +168,12 @@ func (q *Query[T]) Build() *Query[T] {
 
 	//generate order by
 
-	query = fmt.Sprintf(`SELECT %s FROM %s`, strings.Join(selectColumns, ","), q.FromTable.FullTableName())
+	query = fmt.Sprintf("SELECT\n\t%s\nFROM\n\t%s", strings.Join(selectColumns, ",\n\t"), q.FromTable.FullTableName())
+
+	if len(q.JoinStmt) > 0 {
+		//q.FromTable.generateJoinStmt(q.JoinStmt,"")
+	}
+
 	if len(q.WhereStmts) > 0 {
 		query = fmt.Sprintf("%s\n%s", query, generateWhere(q.WhereStmts))
 	}
@@ -132,7 +202,7 @@ func (q *Query[T]) Run(ctx context.Context, db *sqlx.DB, args ...interface{}) ([
 		if where.RightValue == nil {
 			continue
 		}
-		whereArgs[where.LeftValue] = where.RightValue
+		whereArgs[where.LeftValue.Name] = where.RightValue
 	}
 	return q.FromTable.NamedSelect(ctx, db, q.Query, append(args, whereArgs)...)
 }
