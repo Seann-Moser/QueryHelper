@@ -57,7 +57,7 @@ func getKeys(i ...interface{}) ([]string, error) {
 	}
 	var output []string
 	for k, v := range m {
-		if v == nil || safeString(v) == "" {
+		if v == nil || safeString(v) == "" || safeString(v) == "0" {
 			continue
 		}
 		output = append(output, k)
