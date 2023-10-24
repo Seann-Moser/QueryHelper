@@ -2,6 +2,8 @@ package QueryHelper
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -25,6 +27,16 @@ type WhereStmt struct {
 	Conditional string
 	RightValue  interface{}
 	Level       int
+}
+
+func generateWhere(whereStatments []*WhereStmt) string {
+
+	return ""
+}
+
+func generateGroupBy(groupBy []*Column) string {
+
+	return ""
 }
 
 func QueryTable[T any](table *Table[T]) *Query[T] {
@@ -81,16 +93,33 @@ func (q *Query[T]) Limit(limit int) *Query[T] {
 }
 
 func (q *Query[T]) Build() *Query[T] {
-	//var isGroupBy = len(q.GroupByStmt) > 0
+	var isGroupBy = len(q.GroupByStmt) > 0
+	var query = ""
+	selectColumns := q.FromTable.GetSelectableColumns(isGroupBy, isGroupBy, q.SelectColumns...)
 
-	//selectColumns := q.FromTable.GetSelectableColumns(false, isGroupBy,q.SelectColumns...)
-
-	//whereStmt := q.FromTable.WhereStatement(strings.ToUpper(conditional), keys...)
+	//whereStmt := q.FromTable.  (strings.ToUpper(conditional), keys...)
 	// build sub query
 	//gnereate group by
 
 	//generate order by
 
+	query = fmt.Sprintf(`SELECT %s FROM %s`, strings.Join(selectColumns, ","), q.FromTable.FullTableName())
+	if len(q.WhereStmts) > 0 {
+		query = fmt.Sprintf("%s\n%s", query, generateWhere(q.WhereStmts))
+	}
+
+	if len(q.GroupByStmt) > 0 {
+		query = fmt.Sprintf("%s\n%s", query, generateGroupBy(q.GroupByStmt))
+	}
+
+	if len(q.OrderByStmt) > 0 {
+		query = fmt.Sprintf("%s\n%s", query, q.FromTable.OrderByColumns(q.OrderByStmt...))
+	}
+
+	if q.LimitCount > 0 {
+		query = fmt.Sprintf("%s\nLIMIT %d;", query, q.LimitCount)
+	}
+	q.Query = query
 	return q
 }
 

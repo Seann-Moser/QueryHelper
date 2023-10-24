@@ -393,6 +393,29 @@ func (t *Table[T]) OrderByStatement(orderBy ...string) string {
 	return fmt.Sprintf("ORDER BY %s", strings.Join(orderByValues, ","))
 }
 
+func (t *Table[T]) OrderByColumns(columns ...*Column) string {
+	var orderByValues []string
+
+	for _, column := range t.Columns {
+		if column.Order {
+			columns = append(columns, column)
+		}
+	}
+
+	if len(columns) == 0 {
+		return ""
+	}
+
+	sort.Slice(columns, func(i, j int) bool {
+		return columns[i].OrderPriority < columns[j].OrderPriority
+	})
+	for _, column := range columns {
+		orderByValues = append(orderByValues, column.GetOrderStmt())
+	}
+
+	return fmt.Sprintf("ORDER BY %s", strings.Join(orderByValues, ","))
+}
+
 func (t *Table[T]) IsAutoGenerateID() bool {
 	for _, e := range t.Columns {
 		if e.AutoGenerateID {

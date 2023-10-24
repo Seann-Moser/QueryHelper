@@ -49,7 +49,7 @@ func TestTableJoin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sql, err := fullTable.SelectJoinStmt("", nil, GuestRequestsTable.Columns)
+	sql, err := fullTable.SelectJoinStmt("", nil, false, GuestRequestsTable.Columns)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,5 +65,5 @@ func TestTableCtx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	println(table.Select(ctx, nil, "AND"))
+	println(table.Select(ctx, nil, "and", false))
 }
