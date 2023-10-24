@@ -24,7 +24,7 @@ func GetColumnFromTag(name, data string, p reflect.Type) (*Column, error) {
 	con := map[string]interface{}{}
 	con["select"] = true
 	con["data_type"] = convertTypeToSql(name, p)
-	con["name"] = name
+	con["name"] = ToSnakeCase(name)
 	for _, row := range dataPoints {
 		v := strings.Split(row, EqualSplit)
 		key := strings.TrimSpace(v[0])
@@ -33,16 +33,7 @@ func GetColumnFromTag(name, data string, p reflect.Type) (*Column, error) {
 			value = strings.TrimSpace(v[1])
 		}
 		switch strings.ToLower(key) {
-		case "primary", "join", "select", "update", "skip", "null", "delete", "order_acs", "auto_generate_id", "order":
-			if value != "" {
-				t, err := strconv.ParseBool(value)
-				if err == nil {
-					con[key] = t
-				}
-			} else {
-				con[key] = true
-			}
-		case "where", "join_name", "data_type", "default", "where_join", "foreign_key", "foreign_table", "auto_generate_id_type":
+		case "where", "join_name", "data_type", "default", "where_join", "foreign_key", "foreign_table", "auto_generate_id_type", "group_by_modifier":
 			if key == "data_type" {
 				con["data_type"] = value
 			}

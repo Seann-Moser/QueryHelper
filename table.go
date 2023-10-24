@@ -91,6 +91,12 @@ func ToSnakeCase(str string) string {
 	return strings.ToLower(snake)
 }
 
+func (t *Table[T]) GetColumn(name string) *Column {
+	if column, found := t.Columns[ToSnakeCase(name)]; found {
+		return column
+	}
+	return nil
+}
 func (t *Table[T]) InitializeTable(ctx context.Context, db *sqlx.DB, dropTable, updateTable bool) error {
 	stmts, err := t.CreateMySqlTableStatement(dropTable)
 	if err != nil {
@@ -177,9 +183,9 @@ func (t *Table[T]) WhereValues(whereElementsStr ...string) []string {
 		case "not in":
 			fallthrough
 		case "in":
-			formatted = fmt.Sprintf("%s %s (:%s)", column.FullName(), tmp, column.Name)
+			formatted = fmt.Sprintf("%s %s (:%s)", column.FullName(false), tmp, column.Name)
 		default:
-			formatted = fmt.Sprintf("%s %s :%s", column.FullName(), tmp, column.Name)
+			formatted = fmt.Sprintf("%s %s :%s", column.FullName(false), tmp, column.Name)
 		}
 		if strings.Contains(formatted, ".") {
 			whereValues = append(whereValues, formatted)
@@ -272,8 +278,8 @@ func (t *Table[T]) UpdateTable(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func (t *Table[T]) Select(ctx context.Context, db *sqlx.DB, conditional string, args ...interface{}) ([]*T, error) {
-	query := fmt.Sprintf("SELECT %s FROM %s", strings.Join(t.GetSelectableColumns(false), ","), t.FullTableName())
+func (t *Table[T]) Select(ctx context.Context, db *sqlx.DB, conditional string, groupBy bool, args ...interface{}) ([]*T, error) {
+	query := fmt.Sprintf("SELECT %s FROM %s", strings.Join(t.GetSelectableColumns(false, groupBy), ","), t.FullTableName())
 	keys, err := getKeys(args...)
 	if err != nil {
 		return nil, err
@@ -315,17 +321,40 @@ func (t *Table[T]) NamedSelect(ctx context.Context, db *sqlx.DB, query string, a
 	return output, nil
 }
 
-func (t *Table[T]) GetSelectableColumns(useAs bool) []string {
+func (t *Table[T]) GetSelectableColumns(useAs bool, groupBy bool, names ...*Column) []string {
 	var selectValues []string
 	var suffix string
+	if len(names) > 0 {
+		for _, name := range names {
+			if name == nil {
+				continue
+			}
+			e, found := t.Columns[name.Name]
+			if !found {
+				continue
+			}
+			if useAs {
+				suffix = fmt.Sprintf(" AS %s", e.Name)
+			} else {
+				suffix = ""
+			}
+
+			if e.Select {
+				selectValues = append(selectValues, fmt.Sprintf("%s%s", e.FullName(groupBy), suffix))
+			}
+		}
+		return selectValues
+	}
+
 	for _, e := range t.Columns {
 		if useAs {
 			suffix = fmt.Sprintf(" AS %s", e.Name)
 		} else {
 			suffix = ""
 		}
+
 		if e.Select {
-			selectValues = append(selectValues, fmt.Sprintf("%s%s", e.FullName(), suffix))
+			selectValues = append(selectValues, fmt.Sprintf("%s%s", e.FullName(groupBy), suffix))
 		}
 	}
 	return selectValues
@@ -359,6 +388,29 @@ func (t *Table[T]) OrderByStatement(orderBy ...string) string {
 			}
 		}
 	}
+	if len(columns) == 0 {
+		return ""
+	}
+
+	sort.Slice(columns, func(i, j int) bool {
+		return columns[i].OrderPriority < columns[j].OrderPriority
+	})
+	for _, column := range columns {
+		orderByValues = append(orderByValues, column.GetOrderStmt())
+	}
+
+	return fmt.Sprintf("ORDER BY %s", strings.Join(orderByValues, ","))
+}
+
+func (t *Table[T]) OrderByColumns(columns ...*Column) string {
+	var orderByValues []string
+
+	for _, column := range t.Columns {
+		if column.Order {
+			columns = append(columns, column)
+		}
+	}
+
 	if len(columns) == 0 {
 		return ""
 	}
@@ -414,7 +466,7 @@ func (t *Table[T]) GenerateID() map[string]string {
 	return m
 }
 
-func (t *Table[T]) InsertStatement() string {
+func (t *Table[T]) InsertStatement(amount int) string {
 	var columnNames []string
 	var values []string
 	for _, e := range t.Columns {
@@ -427,9 +479,14 @@ func (t *Table[T]) InsertStatement() string {
 	if len(columnNames) == 0 {
 		return ""
 	}
-	insert := fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s);",
+	var rows []string
+	for i := 0; i < amount; i++ {
+		rows = append(rows, fmt.Sprintf("(%s)", strings.Join(values, ",")))
+	}
+
+	insert := fmt.Sprintf("INSERT INTO %s(%s) VALUES \n%s;",
 		t.FullTableName(),
-		strings.Join(columnNames, ","), strings.Join(values, ","))
+		strings.Join(columnNames, ","), strings.Join(rows, ","))
 	return insert
 }
 
@@ -522,7 +579,7 @@ func (t *Table[T]) GetCommonColumns(columns map[string]*Column) map[string]*Colu
 	return overlappingColumns
 }
 
-func (t *Table[T]) SelectJoinStmt(JoinType string, orderBy []string, tableColumns ...map[string]*Column) (string, error) {
+func (t *Table[T]) SelectJoinStmt(JoinType string, orderBy []string, groupBy bool, tableColumns ...map[string]*Column) (string, error) {
 	overlappingColumns := map[string]*Column{}
 	allColumns := map[string]*Column{}
 	for _, columns := range tableColumns {
@@ -534,7 +591,7 @@ func (t *Table[T]) SelectJoinStmt(JoinType string, orderBy []string, tableColumn
 	}
 	joinStmt := t.generateJoinStmt(overlappingColumns, JoinType)
 	whereStmt := t.generateWhereStmt(allColumns)
-	columns := t.GetSelectableColumns(false)
+	columns := t.GetSelectableColumns(false, groupBy)
 	selectStmt := fmt.Sprintf("SELECT %s FROM %s %s %s %s", strings.Join(columns, ","), t.FullTableName(), joinStmt, whereStmt, t.OrderByStatement(orderBy...))
 	t.OrderByStatement()
 	return selectStmt, nil
@@ -558,7 +615,7 @@ func (t *Table[T]) generateJoinStmt(columns map[string]*Column, JoinType string)
 			continue
 		}
 
-		joinStmt := fmt.Sprintf(" %s %s ON %s.%s = %s.%s", joinExp, column.FullTableName(), column.Table, column.Name, t.Name, name)
+		joinStmt := fmt.Sprintf("%s %s ON %s.%s = %s.%s", joinExp, column.FullTableName(), column.Table, column.Name, t.Name, name)
 		joinStmts = append(joinStmts, joinStmt)
 	}
 	return strings.Join(joinStmts, " ")
@@ -575,7 +632,7 @@ func (t *Table[T]) generateWhereStmt(columns map[string]*Column) string {
 	return fmt.Sprintf(" WHERE %s", strings.Join(stmts, " AND "))
 }
 
-func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s T) (sql.Result, string, error) {
+func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s ...T) (sql.Result, string, error) {
 	if db == nil {
 		db = t.db
 	}
@@ -588,10 +645,10 @@ func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s T) (sql.Result, st
 		if err != nil {
 			return nil, "", err
 		}
-		results, err := db.NamedExecContext(ctx, t.InsertStatement(), args)
+		results, err := db.NamedExecContext(ctx, t.InsertStatement(len(s)), args)
 		return results, generateIds[t.GetGenerateID()[0].Name], err
 	}
-	results, err := db.NamedExecContext(ctx, t.InsertStatement(), s)
+	results, err := db.NamedExecContext(ctx, t.InsertStatement(len(s)), s)
 	return results, "", err
 }
 

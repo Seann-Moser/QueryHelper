@@ -2,18 +2,20 @@ package QueryHelper
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 )
 
 type FullTestStruct struct {
-	ID               string `json:"chapter_id" db:"chapter_id" qc:"where:=;delete;auto_generate_id;auto_generate_id_type:base64,join"`
-	Public           bool   `json:"public" db:"public" qc:"default:true;primary"`
-	BookID           string `json:"book_id" db:"book_id" qc:"primary"`
-	Number           int    `json:"chapter_number" db:"chapter_number" qc:"primary;update;order"`
-	Language         string `json:"language" db:"language" qc:"primary;update,order;order_priority:1"`
-	Image            string `json:"cover_image" db:"cover_image" qc:"update"`
-	UpdatedTimestamp string `db:"updated_timestamp" json:"updated_timestamp" qc:"skip;default:updated_timestamp" `
-	CreatedTimestamp string `db:"created_timestamp" json:"created_timestamp" qc:"skip;default:created_timestamp"`
+	ID               string         `json:"chapter_id" db:"chapter_id" qc:"where:=;delete;auto_generate_id;auto_generate_id_type:base64,join"`
+	Public           bool           `json:"public" db:"public" qc:"default:true;primary"`
+	BookID           string         `json:"book_id" db:"book_id" qc:"primary"`
+	Number           int            `json:"chapter_number" db:"chapter_number" qc:"primary;update;order;group_by_modifier::count"`
+	Language         string         `json:"language" db:"language" qc:"primary;update,order;order_priority:1"`
+	Image            string         `json:"cover_image" db:"cover_image" qc:"update"`
+	UpdatedTimestamp string         `db:"updated_timestamp" json:"updated_timestamp" qc:"skip;default:updated_timestamp" `
+	CreatedTimestamp string         `db:"created_timestamp" json:"created_timestamp" qc:"skip;default:created_timestamp"`
+	TestNull         sql.NullString `db:"null_string" json:"test_null" qc:"null"`
 }
 
 type GuestRequests struct {
@@ -36,6 +38,12 @@ func TestNewTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	query := QueryTable[FullTestStruct](table).Select().Where(table.GetColumn("chapter_id"), "in", "", 0, nil).Build()
+	println(query.Query)
+
+	query = QueryTable[FullTestStruct](table).Select(table.GetColumn("book_id"), table.GetColumn("number")).Where(table.GetColumn("chapter_id"), "in", "", 2, nil).Where(table.GetColumn("language"), "=", "", 1, nil).GroupBy(table.GetColumn("book_id")).Build()
+	println(query.Query)
+
 }
 
 func TestTableJoin(t *testing.T) {
@@ -49,11 +57,20 @@ func TestTableJoin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sql, err := fullTable.SelectJoinStmt("", nil, GuestRequestsTable.Columns)
+	sql, err := fullTable.SelectJoinStmt("", nil, false, GuestRequestsTable.Columns)
 	if err != nil {
 		t.Fatal(err)
 	}
 	println(sql)
+
+	query := QueryTable[FullTestStruct](fullTable).
+		//Select(fullTable.GetColumn("book_id"), fullTable.GetColumn("number")).
+		Join(GuestRequestsTable.Columns, "LEFT").
+		Where(fullTable.GetColumn("chapter_id"), "in", "", 2, nil).
+		Where(fullTable.GetColumn("language"), "=", "", 1, nil).
+		GroupBy(fullTable.GetColumn("book_id")).
+		Build()
+	println(query.Query)
 }
 
 func TestTableCtx(t *testing.T) {
@@ -65,5 +82,5 @@ func TestTableCtx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	println(table.Select(ctx, nil, "AND"))
+	println(table.Select(ctx, nil, "and", false))
 }
