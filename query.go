@@ -167,7 +167,7 @@ func (q *Query[T]) Limit(limit int) *Query[T] {
 
 func (q *Query[T]) Build() *Query[T] {
 	var isGroupBy = len(q.GroupByStmt) > 0
-	var query = ""
+	var query string
 	selectColumns := q.FromTable.GetSelectableColumns(isGroupBy, isGroupBy, q.SelectColumns...)
 
 	if q.FromQuery != nil {
