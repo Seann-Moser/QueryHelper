@@ -66,6 +66,24 @@ func getKeys(i ...interface{}) ([]string, error) {
 	return output, nil
 }
 
+func combineStructsWithPrefix[T any](i ...T) (map[string]interface{}, error) {
+	output := map[string]interface{}{}
+	for rowIndex, s := range i {
+		b, err := json.Marshal(s)
+		if err != nil {
+			return nil, err
+		}
+		t := map[string]interface{}{}
+		err = json.Unmarshal(b, &t)
+		if err != nil {
+			return nil, err
+		}
+
+		output = JoinMapsWithPrefix(fmt.Sprintf("%d_", rowIndex), output, t)
+	}
+	return output, nil
+}
+
 func combineStructs(i ...interface{}) (map[string]interface{}, error) {
 	output := map[string]interface{}{}
 	for _, s := range i {
@@ -83,6 +101,27 @@ func combineStructs(i ...interface{}) (map[string]interface{}, error) {
 	return output, nil
 }
 
+func JoinMapsWithPrefix[T any](prefix string, m ...map[string]T) map[string]T {
+	output := map[string]T{}
+	for _, currentMap := range m {
+		for k, v := range currentMap {
+			if _, found := output[prefix+k]; !found {
+				output[prefix+k] = v
+			}
+		}
+	}
+	return output
+}
+
+func AddPrefix(prefix string, i map[string]interface{}) map[string]interface{} {
+	output := map[string]interface{}{}
+	for k, v := range i {
+		if _, found := output[prefix+k]; !found {
+			output[prefix+k] = v
+		}
+	}
+	return output
+}
 func JoinMaps[T any](m ...map[string]T) map[string]T {
 	output := map[string]T{}
 	for _, currentMap := range m {

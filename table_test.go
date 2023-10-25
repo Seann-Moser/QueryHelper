@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+
+	"github.com/jmoiron/sqlx"
 )
 
 type FullTestStruct struct {
@@ -42,7 +44,10 @@ func TestNewTable(t *testing.T) {
 	println(query.Query)
 
 	query = QueryTable[FullTestStruct](table).Select(table.GetColumn("book_id"), table.GetColumn("number")).Where(table.GetColumn("chapter_id"), "in", "", 2, nil).Where(table.GetColumn("language"), "=", "", 1, nil).GroupBy(table.GetColumn("book_id")).Build()
+
 	println(query.Query)
+
+	table.Insert(context.Background(), &sqlx.DB{}, FullTestStruct{}, FullTestStruct{}, FullTestStruct{})
 
 }
 
