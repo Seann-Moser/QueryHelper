@@ -474,20 +474,28 @@ func (t *Table[T]) InsertStatement(amount int) string {
 			continue
 		}
 		columnNames = append(columnNames, e.Name)
-		values = append(values, ":"+e.Name)
+		values = append(values, e.Name)
 	}
 	if len(columnNames) == 0 {
 		return ""
 	}
 	var rows []string
 	for i := 0; i < amount; i++ {
-		rows = append(rows, fmt.Sprintf("(%s)", strings.Join(values, ",")))
+		rows = append(rows, fmt.Sprintf("(%s)", strings.Join(ArrayWithPrefix(fmt.Sprintf(":%d_", i), values), ",")))
 	}
 
 	insert := fmt.Sprintf("INSERT INTO %s(%s) VALUES \n%s;",
 		t.FullTableName(),
-		strings.Join(columnNames, ","), strings.Join(rows, ","))
+		strings.Join(columnNames, ","), strings.Join(rows, ",\n"))
 	return insert
+}
+
+func ArrayWithPrefix(prefix string, list []string) []string {
+	var rows []string
+	for _, i := range list {
+		rows = append(rows, fmt.Sprintf("%s%s", prefix, i))
+	}
+	return rows
 }
 
 func (t *Table[T]) UpdateStatement() string {
@@ -639,16 +647,28 @@ func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s ...T) (sql.Result,
 	if db == nil {
 		return nil, "", nil
 	}
+
 	if t.IsAutoGenerateID() {
 		generateIds := t.GenerateID()
-		args, err := combineStructs(generateIds, s)
-		if err != nil {
-			return nil, "", err
+		args := map[string]interface{}{}
+		for rowIndex, i := range s {
+			tmpArgs, err := combineStructs(generateIds, i)
+			if err != nil {
+				return nil, "", err
+			}
+			tmpArgs = AddPrefix(fmt.Sprintf("%d_", rowIndex), tmpArgs)
+			args, err = combineStructs(args, tmpArgs)
+			if err != nil {
+				return nil, "", err
+			}
 		}
+
 		results, err := db.NamedExecContext(ctx, t.InsertStatement(len(s)), args)
 		return results, generateIds[t.GetGenerateID()[0].Name], err
 	}
-	results, err := db.NamedExecContext(ctx, t.InsertStatement(len(s)), s)
+	args, err := combineStructsWithPrefix[T](s...)
+
+	results, err := db.NamedExecContext(ctx, t.InsertStatement(len(s)), args)
 	return results, "", err
 }
 
