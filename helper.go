@@ -40,6 +40,12 @@ func fixArrays(query string, args map[string]interface{}) string {
 			}
 			newArgs := []string{}
 			switch t := v.(type) {
+			case []interface{}:
+				for i := 0; i < len(t); i++ {
+					newKey := fmt.Sprintf("%s_%d", k, i)
+					newArgs = append(newArgs, ":"+newKey)
+					args[newKey] = t[i]
+				}
 			case []string:
 				for i := 0; i < len(t); i++ {
 					newKey := fmt.Sprintf("%s_%d", k, i)

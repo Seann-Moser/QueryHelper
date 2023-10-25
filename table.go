@@ -571,7 +571,7 @@ func (t *Table[T]) HasColumn(c *Column) (string, bool) {
 			return column.Name, true
 		}
 		if c.Name == column.JoinName && len(column.JoinName) > 0 {
-			return column.JoinName, true
+			return column.Name, true
 		}
 	}
 	return "", false
