@@ -38,13 +38,42 @@ func fixArrays(query string, args map[string]interface{}) string {
 				query = strings.ReplaceAll(query, namedArg, fmt.Sprintf("(%s)", s))
 				continue
 			}
-			st := strings.Split(s, ",")
 			newArgs := []string{}
-			for i := 0; i < len(st); i++ {
-				newKey := fmt.Sprintf(":%s_%d", k, i)
-				newArgs = append(newArgs, newKey)
-				args[newKey] = st[i]
+			switch t := v.(type) {
+			case []string:
+				for i := 0; i < len(t); i++ {
+					newKey := fmt.Sprintf("%s_%d", k, i)
+					newArgs = append(newArgs, ":"+newKey)
+					args[newKey] = t[i]
+				}
+			case []int:
+				for i := 0; i < len(t); i++ {
+					newKey := fmt.Sprintf("%s_%d", k, i)
+					newArgs = append(newArgs, ":"+newKey)
+					args[newKey] = t[i]
+				}
+			case []int64:
+				for i := 0; i < len(t); i++ {
+					newKey := fmt.Sprintf("%s_%d", k, i)
+					newArgs = append(newArgs, ":"+newKey)
+					args[newKey] = t[i]
+				}
+			case []float64:
+				for i := 0; i < len(t); i++ {
+					newKey := fmt.Sprintf("%s_%d", k, i)
+					newArgs = append(newArgs, ":"+newKey)
+					args[newKey] = t[i]
+				}
+			default:
+				st := strings.Split(s, ",")
+
+				for i := 0; i < len(st); i++ {
+					newKey := fmt.Sprintf("%s_%d", k, i)
+					newArgs = append(newArgs, ":"+newKey)
+					args[newKey] = st[i]
+				}
 			}
+
 			query = strings.ReplaceAll(query, namedArg, fmt.Sprintf("(%s)", strings.Join(newArgs, ",")))
 		}
 	}
