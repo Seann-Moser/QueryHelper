@@ -652,6 +652,23 @@ func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s ...T) (sql.Result,
 	return results, "", err
 }
 
+func (t *Table[T]) InsertTx(ctx context.Context, db *sqlx.Tx, s ...T) (sql.Result, string, error) {
+	if db == nil {
+		return nil, "", nil
+	}
+	if t.IsAutoGenerateID() {
+		generateIds := t.GenerateID()
+		args, err := combineStructs(generateIds, s)
+		if err != nil {
+			return nil, "", err
+		}
+		results, err := db.NamedExecContext(ctx, t.InsertStatement(len(s)), args)
+		return results, generateIds[t.GetGenerateID()[0].Name], err
+	}
+	results, err := db.NamedExecContext(ctx, t.InsertStatement(len(s)), s)
+	return results, "", err
+}
+
 func (t *Table[T]) Delete(ctx context.Context, db *sqlx.DB, s T) (sql.Result, error) {
 	if db == nil {
 		db = t.db
@@ -662,10 +679,24 @@ func (t *Table[T]) Delete(ctx context.Context, db *sqlx.DB, s T) (sql.Result, er
 	return db.NamedExecContext(ctx, t.DeleteStatement(), s)
 }
 
+func (t *Table[T]) DeleteTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, error) {
+	if db == nil {
+		return nil, nil
+	}
+	return db.NamedExecContext(ctx, t.DeleteStatement(), s)
+}
+
 func (t *Table[T]) Update(ctx context.Context, db *sqlx.DB, s T) (sql.Result, error) {
 	if db == nil {
 		db = t.db
 	}
+	if db == nil {
+		return nil, nil
+	}
+	return db.NamedExecContext(ctx, t.UpdateStatement(), s)
+}
+
+func (t *Table[T]) UpdateTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, error) {
 	if db == nil {
 		return nil, nil
 	}
