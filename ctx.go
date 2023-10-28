@@ -3,8 +3,7 @@ package QueryHelper
 import (
 	"context"
 	"errors"
-
-	"github.com/jmoiron/sqlx"
+	"strings"
 )
 
 var (
@@ -13,13 +12,12 @@ var (
 
 type tableCtxName string
 
-func AddTableCtx[T any](ctx context.Context, db *sqlx.DB, dataset string, dropTable, updateColumns bool) (context.Context, error) {
-	table, err := NewTable[T](dataset)
+func AddTableCtx[T any](ctx context.Context, db DB, dataset string, queryType QueryType, suffix ...string) (context.Context, error) {
+	table, err := NewTable[T](dataset, queryType)
 	if err != nil {
 		return ctx, err
 	}
-
-	err = table.InitializeTable(ctx, db, dropTable, updateColumns)
+	err = table.InitializeTable(ctx, db, suffix...)
 	if err != nil {
 		return nil, err
 	}
@@ -27,11 +25,11 @@ func AddTableCtx[T any](ctx context.Context, db *sqlx.DB, dataset string, dropTa
 	return ctx, nil
 }
 
-func GetTableCtx[T any](ctx context.Context) (*Table[T], error) {
+func GetTableCtx[T any](ctx context.Context, suffix ...string) (*Table[T], error) {
 	var s T
 	name := ToSnakeCase(getType(s))
 
-	value := ctx.Value(tableCtxName(name))
+	value := ctx.Value(tableCtxName(strings.Join(append([]string{name}, suffix...), "_")))
 	if value == nil {
 		return nil, ErrTableNotInCtx
 	}

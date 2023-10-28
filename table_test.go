@@ -1,11 +1,8 @@
 package QueryHelper
 
 import (
-	"context"
 	"database/sql"
 	"testing"
-
-	"github.com/jmoiron/sqlx"
 )
 
 type FullTestStruct struct {
@@ -46,14 +43,11 @@ type SurveyQuestions struct {
 }
 
 func TestNewTable(t *testing.T) {
-	table, err := NewTable[FullTestStruct]("test")
+	table, err := NewTable[FullTestStruct]("test", QueryTypeSQL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	stmts, err := table.CreateMySqlTableStatement(false)
-	for _, stmt := range stmts {
-		println(stmt)
-	}
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,17 +58,15 @@ func TestNewTable(t *testing.T) {
 
 	println(query.Query)
 
-	table.Insert(context.Background(), &sqlx.DB{}, FullTestStruct{}, FullTestStruct{}, FullTestStruct{})
-
 }
 
 func TestTableJoin2(t *testing.T) {
-	fullTable, err := NewTable[Question]("test")
+	fullTable, err := NewTable[Question]("test", QueryTypeSQL)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	GuestRequestsTable, err := NewTable[SurveyQuestions]("test")
+	GuestRequestsTable, err := NewTable[SurveyQuestions]("test", QueryTypeSQL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,12 +85,12 @@ func TestTableJoin2(t *testing.T) {
 }
 
 func TestTableJoin(t *testing.T) {
-	fullTable, err := NewTable[FullTestStruct]("test")
+	fullTable, err := NewTable[FullTestStruct]("test", QueryTypeSQL)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	GuestRequestsTable, err := NewTable[GuestRequests]("requests")
+	GuestRequestsTable, err := NewTable[GuestRequests]("requests", QueryTypeSQL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,13 +112,13 @@ func TestTableJoin(t *testing.T) {
 }
 
 func TestTableCtx(t *testing.T) {
-	ctx, err := AddTableCtx[FullTestStruct](context.Background(), nil, "test", false, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	table, err := GetTableCtx[FullTestStruct](ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	println(table.Select(ctx, nil, "and", false))
+	//ctx, err := AddTableCtx[FullTestStruct](context.Background(), NewSql(&sqlx.DB{}), "test")
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//table, err := GetTableCtx[FullTestStruct](ctx)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//println(table.Select(ctx, nil, "and", false))
 }

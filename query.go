@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-
-	"github.com/jmoiron/sqlx"
 )
 
 type Query[T any] struct {
@@ -167,6 +165,39 @@ func (q *Query[T]) Limit(limit int) *Query[T] {
 }
 
 func (q *Query[T]) Build() *Query[T] {
+	switch q.FromTable.QueryType {
+	case QueryTypeFireBase:
+	case QueryTypeSQL:
+		fallthrough
+	default:
+		return q.buildSqlQuery()
+	}
+	return q
+}
+
+func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, error) {
+	if len(q.Query) == 0 {
+		q.Build()
+	}
+	return q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
+}
+
+func (q *Query[T]) Args(args ...interface{}) map[string]interface{} {
+	whereArgs := map[string]interface{}{}
+	for _, where := range q.WhereStmts {
+		if where.RightValue == nil {
+			continue
+		}
+		whereArgs[where.LeftValue.Name] = where.RightValue
+	}
+	arg, err := combineStructs(append(args, whereArgs)...)
+	if err != nil {
+		return nil
+	}
+	return arg
+}
+
+func (q *Query[T]) buildSqlQuery() *Query[T] {
 	var isGroupBy = len(q.GroupByStmt) > 0
 	var query string
 	selectColumns := q.FromTable.GetSelectableColumns(isGroupBy, isGroupBy, q.SelectColumns...)
@@ -210,29 +241,7 @@ func (q *Query[T]) Build() *Query[T] {
 	return q
 }
 
-func (q *Query[T]) Run(ctx context.Context, db *sqlx.DB, args ...interface{}) ([]*T, error) {
-	if len(q.Query) == 0 {
-		q.Build()
-	}
-	return q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
-}
-
-func (q *Query[T]) Args(args ...interface{}) map[string]interface{} {
-	whereArgs := map[string]interface{}{}
-	for _, where := range q.WhereStmts {
-		if where.RightValue == nil {
-			continue
-		}
-		whereArgs[where.LeftValue.Name] = where.RightValue
-	}
-	arg, err := combineStructs(append(args, whereArgs)...)
-	if err != nil {
-		return nil
-	}
-	return arg
-}
-
-func SelectQuery[T any, X any](ctx context.Context, db *sqlx.DB, q *Query[T], args ...interface{}) ([]*X, error) {
+func SelectQuery[T any, X any](ctx context.Context, db DB, q *Query[T], args ...interface{}) ([]*X, error) {
 	if len(q.Query) == 0 {
 		q.Build()
 	}
