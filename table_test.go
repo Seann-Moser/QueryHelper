@@ -50,10 +50,7 @@ func TestNewTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stmts, err := table.CreateMySqlTableStatement(false)
-	for _, stmt := range stmts {
-		println(stmt)
-	}
+
 	if err != nil {
 		t.Fatal(err)
 	}

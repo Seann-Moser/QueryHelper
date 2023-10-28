@@ -34,7 +34,7 @@ type Table[T any] struct {
 	Name    string             `json:"name"`
 	Columns map[string]*Column `json:"columns"`
 
-	db *sqlx.DB
+	db DB
 }
 
 func NewTable[T any](databaseName string) (*Table[T], error) {
@@ -97,69 +97,17 @@ func (t *Table[T]) GetColumn(name string) *Column {
 	}
 	return nil
 }
-func (t *Table[T]) InitializeTable(ctx context.Context, db *sqlx.DB, dropTable, updateTable bool) error {
-	stmts, err := t.CreateMySqlTableStatement(dropTable)
+
+func (t *Table[T]) InitializeTable(ctx context.Context, db DB, suffix ...string) error {
+	if t.db == nil {
+		t.db = db
+	}
+	t.Name = strings.Join(append([]string{t.Name}, suffix...), "_")
+	err := db.CreateTable(ctx, t.Dataset, t.Name, t.Columns)
 	if err != nil {
 		return err
 	}
-	if db == nil {
-		return nil
-	}
-	for _, stmt := range stmts {
-		_, err = db.ExecContext(ctx, stmt)
-		if err != nil {
-			return err
-		}
-	}
-	t.db = db
-	if !updateTable {
-		return nil
-	}
-	return t.UpdateTable(ctx, db)
-}
-
-func (t *Table[T]) CreateMySqlTableStatement(dropTable bool) ([]string, error) {
-	createSchemaStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", t.Dataset)
-	var PrimaryKeys []string
-	var FK []string
-	createStatement := ""
-	if dropTable {
-		createStatement += fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", t.FullTableName())
-	}
-	createStatement += fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s(", t.FullTableName())
-
-	var columns []*Column
-
-	for _, column := range t.Columns {
-		columns = append(columns, column)
-	}
-
-	sort.Slice(columns, func(i, j int) bool {
-		return columns[i].ColumnOrder < columns[j].ColumnOrder
-	})
-
-	for _, column := range columns {
-		createStatement += column.GetDefinition() + ","
-		if column.HasFK() {
-			FK = append(FK, column.GetFK())
-		}
-		if column.Primary {
-			PrimaryKeys = append(PrimaryKeys, column.Name)
-		}
-	}
-	if len(PrimaryKeys) == 0 {
-		return nil, MissingPrimaryKeyErr
-	} else if len(PrimaryKeys) == 1 {
-		createStatement += fmt.Sprintf("\n\tPRIMARY KEY(%s)", PrimaryKeys[0])
-	} else {
-		createStatement += fmt.Sprintf("\n\tCONSTRAINT PK_%s_%s PRIMARY KEY (%s)", t.Dataset, t.Name, strings.Join(PrimaryKeys, ","))
-
-	}
-	if len(FK) > 0 {
-		createStatement += "," + strings.Join(FK, ",")
-	}
-	createStatement += "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8"
-	return []string{createSchemaStatement, createStatement}, nil
+	return nil
 }
 
 func (t *Table[T]) FullTableName() string {
@@ -196,89 +144,7 @@ func (t *Table[T]) WhereValues(whereElementsStr ...string) []string {
 
 }
 
-func (t *Table[T]) GetColumns(ctx context.Context, db *sqlx.DB) ([]*sql.ColumnType, error) {
-	if db == nil {
-		db = t.db
-	}
-	if db == nil {
-		return nil, nil
-	}
-	rows, err := db.QueryxContext(ctx, fmt.Sprintf("SELECT * FROM %s limit 1;", t.FullTableName()))
-	if err != nil {
-		return nil, err
-	}
-	cols, err := rows.ColumnTypes()
-	if err != nil {
-		return nil, err
-	}
-	return cols, nil
-}
-
-func (t *Table[T]) GetUpdateStmt(add bool, columnList ...*Column) string {
-	var output []string
-	for _, column := range columnList {
-		output = append(output, column.GetUpdateStmt(add))
-	}
-	return fmt.Sprintf("ALTER TABLE %s %s;", t.FullTableName(), strings.Join(output, ","))
-}
-
-func (t *Table[T]) UpdateTable(ctx context.Context, db *sqlx.DB) error {
-	if db == nil {
-		db = t.db
-	}
-	if db == nil {
-		return nil
-	}
-	cols, err := t.GetColumns(ctx, db)
-	if err != nil {
-		return err
-	}
-
-	var addColumns []*Column
-	var removeColumns []*Column
-	colMap := map[string]*sql.ColumnType{}
-	for _, c := range cols {
-		colMap[c.Name()] = c
-	}
-
-	for _, e := range t.Columns {
-		if _, found := colMap[e.Name]; !found {
-			addColumns = append(addColumns, e)
-		}
-	}
-
-	for _, c := range cols {
-		if foundColumn, found := t.Columns[c.Name()]; found {
-			removeColumns = append(removeColumns, foundColumn)
-		}
-	}
-
-	if len(addColumns) > 0 {
-		addStmt := t.GetUpdateStmt(true, addColumns...)
-		if db != nil {
-			_, err = db.ExecContext(ctx, addStmt)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	if len(removeColumns) > 0 {
-		removeStmt := t.GetUpdateStmt(false, removeColumns...)
-		if db != nil {
-			_, err = db.ExecContext(ctx, removeStmt)
-			if err != nil {
-				return err
-			}
-		}
-
-	}
-	if cols, err := t.GetColumns(ctx, db); err != nil || len(cols) != len(t.Columns) {
-		return fmt.Errorf("update was not successful, columns are different than struct fields: %w", err)
-	}
-	return nil
-}
-
-func (t *Table[T]) Select(ctx context.Context, db *sqlx.DB, conditional string, groupBy bool, args ...interface{}) ([]*T, error) {
+func (t *Table[T]) Select(ctx context.Context, db DB, conditional string, groupBy bool, args ...interface{}) ([]*T, error) {
 	query := fmt.Sprintf("SELECT %s FROM %s", strings.Join(t.GetSelectableColumns(false, groupBy), ","), t.FullTableName())
 	keys, err := getKeys(args...)
 	if err != nil {
@@ -295,7 +161,7 @@ func (t *Table[T]) Select(ctx context.Context, db *sqlx.DB, conditional string, 
 	}
 	return t.NamedSelect(ctx, db, query, args...)
 }
-func (t *Table[T]) NamedSelect(ctx context.Context, db *sqlx.DB, query string, args ...interface{}) ([]*T, error) {
+func (t *Table[T]) NamedSelect(ctx context.Context, db DB, query string, args ...interface{}) ([]*T, error) {
 	if db == nil {
 		db = t.db
 	}
@@ -538,7 +404,7 @@ func (t *Table[T]) CountStatement(conditional string, whereElementsStr ...string
 	return fmt.Sprintf("SELECT COUNT(*) as count FROM %s %s", t.FullTableName(), wh)
 }
 
-func (t *Table[T]) NamedQuery(ctx context.Context, db *sqlx.DB, query string, args ...interface{}) (*sqlx.Rows, error) {
+func (t *Table[T]) NamedQuery(ctx context.Context, db DB, query string, args ...interface{}) (DBRow, error) {
 	if db == nil {
 		db = t.db
 	}
@@ -550,7 +416,7 @@ func (t *Table[T]) NamedQuery(ctx context.Context, db *sqlx.DB, query string, ar
 		return nil, err
 	}
 	query = fixArrays(query, a)
-	return db.NamedQueryContext(ctx, query, a)
+	return db.QueryContext(ctx, query, a)
 }
 
 func (t *Table[T]) HasColumn(c *Column) (string, bool) {
@@ -640,12 +506,12 @@ func (t *Table[T]) generateWhereStmt(columns map[string]*Column) string {
 	return fmt.Sprintf(" WHERE %s", strings.Join(stmts, " AND "))
 }
 
-func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s ...T) (sql.Result, string, error) {
+func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 	if db == nil {
 		db = t.db
 	}
 	if db == nil {
-		return nil, "", nil
+		return "", nil
 	}
 
 	if t.IsAutoGenerateID() {
@@ -654,22 +520,22 @@ func (t *Table[T]) Insert(ctx context.Context, db *sqlx.DB, s ...T) (sql.Result,
 		for rowIndex, i := range s {
 			tmpArgs, err := combineStructs(generateIds, i)
 			if err != nil {
-				return nil, "", err
+				return "", err
 			}
 			tmpArgs = AddPrefix(fmt.Sprintf("%d_", rowIndex), tmpArgs)
 			args, err = combineStructs(args, tmpArgs)
 			if err != nil {
-				return nil, "", err
+				return "", err
 			}
 		}
 
-		results, err := db.NamedExecContext(ctx, t.InsertStatement(len(s)), args)
-		return results, generateIds[t.GetGenerateID()[0].Name], err
+		err := db.ExecContext(ctx, t.InsertStatement(len(s)), args)
+		return generateIds[t.GetGenerateID()[0].Name], err
 	}
 	args, err := combineStructsWithPrefix[T](s...)
 
-	results, err := db.NamedExecContext(ctx, t.InsertStatement(len(s)), args)
-	return results, "", err
+	err = db.ExecContext(ctx, t.InsertStatement(len(s)), args)
+	return "", err
 }
 
 func (t *Table[T]) InsertTx(ctx context.Context, db *sqlx.Tx, s ...T) (sql.Result, string, error) {
@@ -689,14 +555,14 @@ func (t *Table[T]) InsertTx(ctx context.Context, db *sqlx.Tx, s ...T) (sql.Resul
 	return results, "", err
 }
 
-func (t *Table[T]) Delete(ctx context.Context, db *sqlx.DB, s T) (sql.Result, error) {
+func (t *Table[T]) Delete(ctx context.Context, db DB, s T) error {
 	if db == nil {
 		db = t.db
 	}
 	if db == nil {
-		return nil, nil
+		return nil
 	}
-	return db.NamedExecContext(ctx, t.DeleteStatement(), s)
+	return db.ExecContext(ctx, t.DeleteStatement(), s)
 }
 
 func (t *Table[T]) DeleteTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, error) {
@@ -706,14 +572,14 @@ func (t *Table[T]) DeleteTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, 
 	return db.NamedExecContext(ctx, t.DeleteStatement(), s)
 }
 
-func (t *Table[T]) Update(ctx context.Context, db *sqlx.DB, s T) (sql.Result, error) {
+func (t *Table[T]) Update(ctx context.Context, db DB, s T) error {
 	if db == nil {
 		db = t.db
 	}
 	if db == nil {
-		return nil, nil
+		return nil
 	}
-	return db.NamedExecContext(ctx, t.UpdateStatement(), s)
+	return db.ExecContext(ctx, t.UpdateStatement(), s)
 }
 
 func (t *Table[T]) UpdateTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, error) {
@@ -723,7 +589,7 @@ func (t *Table[T]) UpdateTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, 
 	return db.NamedExecContext(ctx, t.UpdateStatement(), s)
 }
 
-func NamedQuery(ctx context.Context, db *sqlx.DB, query string, args ...interface{}) (*sqlx.Rows, error) {
+func NamedQuery(ctx context.Context, db DB, query string, args ...interface{}) (DBRow, error) {
 	if db == nil {
 		return nil, nil
 	}
@@ -732,5 +598,5 @@ func NamedQuery(ctx context.Context, db *sqlx.DB, query string, args ...interfac
 		return nil, err
 	}
 	query = fixArrays(query, a)
-	return db.NamedQueryContext(ctx, query, a)
+	return db.QueryContext(ctx, query, a)
 }

@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-
-	"github.com/jmoiron/sqlx"
 )
 
 type Query[T any] struct {
@@ -210,7 +208,7 @@ func (q *Query[T]) Build() *Query[T] {
 	return q
 }
 
-func (q *Query[T]) Run(ctx context.Context, db *sqlx.DB, args ...interface{}) ([]*T, error) {
+func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, error) {
 	if len(q.Query) == 0 {
 		q.Build()
 	}
@@ -232,7 +230,7 @@ func (q *Query[T]) Args(args ...interface{}) map[string]interface{} {
 	return arg
 }
 
-func SelectQuery[T any, X any](ctx context.Context, db *sqlx.DB, q *Query[T], args ...interface{}) ([]*X, error) {
+func SelectQuery[T any, X any](ctx context.Context, db DB, q *Query[T], args ...interface{}) ([]*X, error) {
 	if len(q.Query) == 0 {
 		q.Build()
 	}
