@@ -43,7 +43,7 @@ type SurveyQuestions struct {
 }
 
 func TestNewTable(t *testing.T) {
-	table, err := NewTable[FullTestStruct]("test")
+	table, err := NewTable[FullTestStruct]("test", QueryTypeSQL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,12 +61,12 @@ func TestNewTable(t *testing.T) {
 }
 
 func TestTableJoin2(t *testing.T) {
-	fullTable, err := NewTable[Question]("test")
+	fullTable, err := NewTable[Question]("test", QueryTypeSQL)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	GuestRequestsTable, err := NewTable[SurveyQuestions]("test")
+	GuestRequestsTable, err := NewTable[SurveyQuestions]("test", QueryTypeSQL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,12 +85,12 @@ func TestTableJoin2(t *testing.T) {
 }
 
 func TestTableJoin(t *testing.T) {
-	fullTable, err := NewTable[FullTestStruct]("test")
+	fullTable, err := NewTable[FullTestStruct]("test", QueryTypeSQL)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	GuestRequestsTable, err := NewTable[GuestRequests]("requests")
+	GuestRequestsTable, err := NewTable[GuestRequests]("requests", QueryTypeSQL)
 	if err != nil {
 		t.Fatal(err)
 	}

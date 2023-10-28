@@ -12,8 +12,8 @@ var (
 
 type tableCtxName string
 
-func AddTableCtx[T any](ctx context.Context, db DB, dataset string, suffix ...string) (context.Context, error) {
-	table, err := NewTable[T](dataset)
+func AddTableCtx[T any](ctx context.Context, db DB, dataset string, queryType QueryType, suffix ...string) (context.Context, error) {
+	table, err := NewTable[T](dataset, queryType)
 	if err != nil {
 		return ctx, err
 	}

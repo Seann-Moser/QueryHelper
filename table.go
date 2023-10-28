@@ -17,6 +17,12 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+type QueryType string
+
+const (
+	QueryTypeSQL      = "sql"
+	QueryTypeFireBase = "firebase"
+)
 const (
 	TagConfigPrefix     = "qc"
 	TagColumnNamePrefix = "db"
@@ -30,20 +36,21 @@ var (
 )
 
 type Table[T any] struct {
-	Dataset string             `json:"dataset"`
-	Name    string             `json:"name"`
-	Columns map[string]*Column `json:"columns"`
-
-	db DB
+	Dataset   string             `json:"dataset"`
+	Name      string             `json:"name"`
+	Columns   map[string]*Column `json:"columns"`
+	QueryType QueryType          `json:"query_type"`
+	db        DB
 }
 
-func NewTable[T any](databaseName string) (*Table[T], error) {
+func NewTable[T any](databaseName string, queryType QueryType) (*Table[T], error) {
 	var err error
 	var s T
 	newTable := Table[T]{
-		Dataset: databaseName,
-		Name:    ToSnakeCase(getType(s)),
-		Columns: map[string]*Column{},
+		Dataset:   databaseName,
+		Name:      ToSnakeCase(getType(s)),
+		Columns:   map[string]*Column{},
+		QueryType: queryType,
 	}
 
 	structType := reflect.TypeOf(s)
