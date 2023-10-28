@@ -41,7 +41,7 @@ func (s *SqlDB) CreateTable(ctx context.Context, dataset, table string, columns 
 		c = append(c, column)
 	}
 
-	sort.Slice(columns, func(i, j int) bool {
+	sort.Slice(c, func(i, j int) bool {
 		return c[i].ColumnOrder < c[j].ColumnOrder
 	})
 

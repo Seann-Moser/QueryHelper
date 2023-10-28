@@ -102,6 +102,9 @@ func (t *Table[T]) InitializeTable(ctx context.Context, db DB, suffix ...string)
 	if t.db == nil {
 		t.db = db
 	}
+	if db == nil {
+		return fmt.Errorf("no db set")
+	}
 	t.Name = strings.Join(append([]string{t.Name}, suffix...), "_")
 	err := db.CreateTable(ctx, t.Dataset, t.Name, t.Columns)
 	if err != nil {
@@ -161,6 +164,7 @@ func (t *Table[T]) Select(ctx context.Context, db DB, conditional string, groupB
 	}
 	return t.NamedSelect(ctx, db, query, args...)
 }
+
 func (t *Table[T]) NamedSelect(ctx context.Context, db DB, query string, args ...interface{}) ([]*T, error) {
 	if db == nil {
 		db = t.db
