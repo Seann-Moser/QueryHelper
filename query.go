@@ -35,7 +35,9 @@ type WhereStmt struct {
 
 func (w *WhereStmt) ToString() string {
 	column := w.LeftValue
-
+	if column == nil {
+		return ""
+	}
 	tmp := column.Where
 	if w.Conditional != "" {
 		tmp = w.Conditional
@@ -99,6 +101,9 @@ func generateList(symbol string, count int) string {
 func generateGroupBy(groupBy []*Column) string {
 	var columns []string
 	for _, c := range groupBy {
+		if c == nil {
+			return ""
+		}
 		columns = append(columns, c.FullName(false))
 	}
 	return "GROUP BY " + strings.Join(columns, ",")
@@ -117,7 +122,12 @@ func QueryTable[T any](table *Table[T]) *Query[T] {
 	}
 }
 func (q *Query[T]) Select(columns ...*Column) *Query[T] {
-	q.SelectColumns = append(q.SelectColumns, columns...)
+	for _, c := range columns {
+		if c == nil {
+			continue
+		}
+		q.SelectColumns = append(q.SelectColumns, c)
+	}
 	return q
 }
 
@@ -138,6 +148,9 @@ func (q *Query[T]) Where(column *Column, conditional, joinOperator string, level
 	if level < 0 {
 		level = 0
 	}
+	if column == nil {
+		return q
+	}
 	q.WhereStmts = append(q.WhereStmts, &WhereStmt{
 		LeftValue:    column,
 		Conditional:  conditional,
@@ -150,12 +163,22 @@ func (q *Query[T]) Where(column *Column, conditional, joinOperator string, level
 }
 
 func (q *Query[T]) GroupBy(column ...*Column) *Query[T] {
-	q.GroupByStmt = append(q.GroupByStmt, column...)
+	for _, c := range column {
+		if c == nil {
+			continue
+		}
+		q.GroupByStmt = append(q.GroupByStmt, c)
+	}
 	return q
 }
 
 func (q *Query[T]) OrderBy(column ...*Column) *Query[T] {
-	q.OrderByStmt = append(q.OrderByStmt, column...)
+	for _, c := range column {
+		if c == nil {
+			continue
+		}
+		q.OrderByStmt = append(q.OrderByStmt, c)
+	}
 	return q
 }
 
