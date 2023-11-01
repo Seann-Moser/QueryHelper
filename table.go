@@ -165,7 +165,7 @@ func (t *Table[T]) Select(ctx context.Context, db DB, conditional string, groupB
 		query = fmt.Sprintf("%s %s", query, t.WhereStatement(strings.ToUpper(conditional), keys...))
 	}
 
-	order := t.OrderByStatement()
+	order := t.OrderByStatement(false)
 	if len(order) > 0 {
 		query = fmt.Sprintf("%s %s", query, order)
 	}
@@ -248,7 +248,7 @@ func (t *Table[T]) WhereStatement(conditional string, whereElementsStr ...string
 	return fmt.Sprintf("WHERE %s", strings.Join(whereValues, fmt.Sprintf(" %s ", conditional)))
 }
 
-func (t *Table[T]) OrderByStatement(orderBy ...string) string {
+func (t *Table[T]) OrderByStatement(groupBy bool, orderBy ...string) string {
 	var orderByValues []string
 
 	var columns []*Column
@@ -273,13 +273,13 @@ func (t *Table[T]) OrderByStatement(orderBy ...string) string {
 		return columns[i].OrderPriority < columns[j].OrderPriority
 	})
 	for _, column := range columns {
-		orderByValues = append(orderByValues, column.GetOrderStmt())
+		orderByValues = append(orderByValues, column.GetOrderStmt(groupBy))
 	}
 
 	return fmt.Sprintf("ORDER BY %s", strings.Join(orderByValues, ","))
 }
 
-func (t *Table[T]) OrderByColumns(columns ...*Column) string {
+func (t *Table[T]) OrderByColumns(groupBy bool, columns ...*Column) string {
 	var orderByValues []string
 
 	for _, column := range t.Columns {
@@ -296,7 +296,7 @@ func (t *Table[T]) OrderByColumns(columns ...*Column) string {
 		return columns[i].OrderPriority < columns[j].OrderPriority
 	})
 	for _, column := range columns {
-		orderByValues = append(orderByValues, column.GetOrderStmt())
+		orderByValues = append(orderByValues, column.GetOrderStmt(groupBy))
 	}
 
 	return fmt.Sprintf("ORDER BY %s", strings.Join(orderByValues, ","))
@@ -477,8 +477,8 @@ func (t *Table[T]) SelectJoinStmt(JoinType string, orderBy []string, groupBy boo
 	joinStmt := t.generateJoinStmt(overlappingColumns, JoinType)
 	whereStmt := t.generateWhereStmt(allColumns)
 	columns := t.GetSelectableColumns(false, groupBy)
-	selectStmt := fmt.Sprintf("SELECT %s FROM %s %s %s %s", strings.Join(columns, ","), t.FullTableName(), joinStmt, whereStmt, t.OrderByStatement(orderBy...))
-	t.OrderByStatement()
+	selectStmt := fmt.Sprintf("SELECT %s FROM %s %s %s %s", strings.Join(columns, ","), t.FullTableName(), joinStmt, whereStmt, t.OrderByStatement(false, orderBy...))
+	t.OrderByStatement(false)
 	return selectStmt, nil
 }
 

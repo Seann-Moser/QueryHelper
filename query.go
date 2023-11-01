@@ -104,7 +104,12 @@ func generateGroupBy(groupBy []*Column) string {
 		if c == nil {
 			return ""
 		}
-		columns = append(columns, c.FullName(false))
+		if c.GroupByName != "" {
+			columns = append(columns, c.GroupByName)
+		} else {
+			columns = append(columns, c.FullName(false))
+		}
+
 	}
 	return "GROUP BY " + strings.Join(columns, ",")
 }
@@ -254,7 +259,7 @@ func (q *Query[T]) buildSqlQuery() *Query[T] {
 	}
 
 	if len(q.OrderByStmt) > 0 {
-		query = fmt.Sprintf("%s\n%s", query, q.FromTable.OrderByColumns(q.OrderByStmt...))
+		query = fmt.Sprintf("%s\n%s", query, q.FromTable.OrderByColumns(len(q.GroupByStmt) > 0, q.OrderByStmt...))
 	}
 
 	if q.LimitCount > 0 {
