@@ -97,9 +97,13 @@ func (c *Column) GetUpdateStmt(add bool) string {
 	return fmt.Sprintf("DROP COLUMN %s;", c.Name)
 }
 
-func (c *Column) GetOrderStmt() string {
-	if c.OrderAsc {
-		return fmt.Sprintf("%s ASC", c.Name)
+func (c *Column) GetOrderStmt(groupBy bool) string {
+	name := c.Name
+	if c.GroupByName != "" {
+		name = c.GroupByName
 	}
-	return fmt.Sprintf("%s DESC", c.Name)
+	if c.OrderAsc {
+		return fmt.Sprintf("%s ASC", name)
+	}
+	return fmt.Sprintf("%s DESC", name)
 }

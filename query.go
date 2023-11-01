@@ -259,7 +259,7 @@ func (q *Query[T]) buildSqlQuery() *Query[T] {
 	}
 
 	if len(q.OrderByStmt) > 0 {
-		query = fmt.Sprintf("%s\n%s", query, q.FromTable.OrderByColumns(q.OrderByStmt...))
+		query = fmt.Sprintf("%s\n%s", query, q.FromTable.OrderByColumns(len(q.GroupByStmt) > 0, q.OrderByStmt...))
 	}
 
 	if q.LimitCount > 0 {
