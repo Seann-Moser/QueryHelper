@@ -2,6 +2,7 @@ package QueryHelper
 
 import (
 	"fmt"
+	"strings"
 )
 
 type Column struct {
@@ -22,6 +23,7 @@ type Column struct {
 	Order          bool `json:"order"`
 
 	GroupByModifier string `json:"group_by_modifier"`
+	GroupByName     string `json:"group_by_name"`
 	GroupByColumn   bool   `json:"group_by_column"`
 	OrderPriority   int    `json:"order_priority"`
 
@@ -64,7 +66,14 @@ func (c *Column) HasFK() bool {
 
 func (c *Column) FullName(groupBy bool) string {
 	if groupBy && len(c.GroupByModifier) > 0 {
-		return fmt.Sprintf("%s(%s.%s)", c.GroupByModifier, c.Table, c.Name)
+		suffix := ""
+		if c.GroupByName != "" {
+			suffix = " AS " + suffix
+		}
+		if strings.Contains(c.GroupByModifier, "*") {
+			return strings.ReplaceAll(c.GroupByModifier, "*", fmt.Sprintf("%s.%s", c.Table, c.Name)) + suffix
+		}
+		return fmt.Sprintf("%s(%s.%s)%s", c.GroupByModifier, c.Table, c.Name, suffix)
 	}
 
 	return fmt.Sprintf("%s.%s", c.Table, c.Name)

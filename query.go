@@ -104,7 +104,12 @@ func generateGroupBy(groupBy []*Column) string {
 		if c == nil {
 			return ""
 		}
-		columns = append(columns, c.FullName(false))
+		if c.GroupByName != "" {
+			columns = append(columns, c.GroupByName)
+		} else {
+			columns = append(columns, c.FullName(false))
+		}
+
 	}
 	return "GROUP BY " + strings.Join(columns, ",")
 }
