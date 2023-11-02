@@ -42,6 +42,15 @@ type SurveyQuestions struct {
 	Number     int    `json:"number" db:"number"`
 }
 
+type Test struct {
+	ID               string `json:"id" db:"id" qc:"primary;join;join_name::audit_id;auto_generate_id;group_by_modifier::count"`
+	AccountID        string `json:"account_id" db:"account_id" qc:"primary;join;join_name::account_id"`
+	UserID           string `json:"user_id" db:"user_id" qc:"primary;data_type::varchar(512);join;join_name::user_id"`
+	Service          string `json:"service" db:"service"`
+	LogType          string `json:"log_type" db:"log_type" qc:"group_by_modifier::count"`
+	CreatedTimestamp string `json:"created_timestamp" db:"created_timestamp" qc:"skip;default::created_timestamp;group_by_modifier::DATE(*);group_by_name::created_date"`
+}
+
 func TestNewTable(t *testing.T) {
 	table, err := NewTable[FullTestStruct]("test", QueryTypeSQL)
 	if err != nil {
@@ -112,6 +121,12 @@ func TestTableJoin(t *testing.T) {
 }
 
 func TestTableCtx(t *testing.T) {
+	fullTable, err := NewTable[Test]("test", QueryTypeSQL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := QueryTable[Test](fullTable).Select().GroupBy(fullTable.GetColumn("account_id"), fullTable.GetColumn("created_timestamp")).Build()
+	println(query.Query)
 	//ctx, err := AddTableCtx[FullTestStruct](context.Background(), NewSql(&sqlx.DB{}), "test")
 	//if err != nil {
 	//	t.Fatal(err)

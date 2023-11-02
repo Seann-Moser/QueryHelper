@@ -210,7 +210,9 @@ func (t *Table[T]) GetSelectableColumns(useAs bool, groupBy bool, names ...*Colu
 			if !found {
 				continue
 			}
-			if useAs {
+			if name.GroupByName != "" && groupBy {
+				suffix = fmt.Sprintf(" AS %s", e.GroupByName)
+			} else if useAs {
 				suffix = fmt.Sprintf(" AS %s", e.Name)
 			} else {
 				suffix = ""
@@ -224,7 +226,9 @@ func (t *Table[T]) GetSelectableColumns(useAs bool, groupBy bool, names ...*Colu
 	}
 
 	for _, e := range t.Columns {
-		if useAs {
+		if e.GroupByName != "" && groupBy {
+			suffix = fmt.Sprintf("%s", e.GroupByName)
+		} else if useAs {
 			suffix = fmt.Sprintf(" AS %s", e.Name)
 		} else {
 			suffix = ""

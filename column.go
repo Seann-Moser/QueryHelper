@@ -11,21 +11,21 @@ type Column struct {
 	Dataset     string `json:"-"`
 	ColumnOrder int    `json:"-"`
 
-	Primary        bool `json:"primary"`
-	Skip           bool `json:"skip"`
-	Update         bool `json:"update"`
-	Null           bool `json:"null"`
-	Select         bool `json:"select"`
-	Delete         bool `json:"delete"`
-	AutoGenerateID bool `json:"auto_generate_id"`
-	Join           bool `json:"join"`
-	OrderAsc       bool `json:"order_asc"`
-	Order          bool `json:"order"`
-
-	GroupByModifier string `json:"group_by_modifier"`
-	GroupByName     string `json:"group_by_name"`
-	GroupByColumn   bool   `json:"group_by_column"`
-	OrderPriority   int    `json:"order_priority"`
+	Primary           bool   `json:"primary"`
+	Skip              bool   `json:"skip"`
+	Update            bool   `json:"update"`
+	Null              bool   `json:"null"`
+	Select            bool   `json:"select"`
+	Delete            bool   `json:"delete"`
+	AutoGenerateID    bool   `json:"auto_generate_id"`
+	Join              bool   `json:"join"`
+	OrderAsc          bool   `json:"order_asc"`
+	Order             bool   `json:"order"`
+	ForceGroupByValue bool   `json:"force_group_by_value"`
+	GroupByModifier   string `json:"group_by_modifier"`
+	GroupByName       string `json:"group_by_name"`
+	GroupByColumn     bool   `json:"group_by_column"`
+	OrderPriority     int    `json:"order_priority"`
 
 	Type    string `json:"data_type"`
 	Default string `json:"default"`
