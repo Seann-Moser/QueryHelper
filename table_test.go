@@ -42,12 +42,13 @@ type SurveyQuestions struct {
 	Number     int    `json:"number" db:"number"`
 }
 
-type Test struct {
+type Log struct {
 	ID               string `json:"id" db:"id" qc:"primary;join;join_name::audit_id;auto_generate_id;group_by_modifier::count"`
 	AccountID        string `json:"account_id" db:"account_id" qc:"primary;join;join_name::account_id"`
 	UserID           string `json:"user_id" db:"user_id" qc:"primary;data_type::varchar(512);join;join_name::user_id"`
 	Service          string `json:"service" db:"service"`
-	LogType          string `json:"log_type" db:"log_type" qc:"group_by_modifier::count"`
+	LogType          string `json:"log_type" db:"log_type"`
+	Data             string `json:"data" db:"data" qc:"data_type::text"`
 	CreatedTimestamp string `json:"created_timestamp" db:"created_timestamp" qc:"skip;default::created_timestamp;group_by_modifier::DATE(*);group_by_name::created_date"`
 }
 
@@ -121,19 +122,26 @@ func TestTableJoin(t *testing.T) {
 }
 
 func TestTableCtx(t *testing.T) {
-	fullTable, err := NewTable[Test]("test", QueryTypeSQL)
+	fullTable, err := NewTable[Log]("audit", QueryTypeSQL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	query := QueryTable[Test](fullTable).Select().GroupBy(fullTable.GetColumn("account_id"), fullTable.GetColumn("created_timestamp")).Build()
-	println(query.Query)
-	//ctx, err := AddTableCtx[FullTestStruct](context.Background(), NewSql(&sqlx.DB{}), "test")
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-	//table, err := GetTableCtx[FullTestStruct](ctx)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-	//println(table.Select(ctx, nil, "and", false))
+
+	auditQuery := QueryTable[Log](fullTable).
+		Select(
+			fullTable.GetColumn("id"),
+			fullTable.GetColumn("account_id"),
+			fullTable.GetColumn("log_type"),
+			fullTable.GetColumn("created_timestamp"),
+		).
+		Where(fullTable.GetColumn("account_id"), "=", "AND", 0, "").
+		GroupBy(fullTable.GetColumn("account_id"), fullTable.GetColumn("created_timestamp")).
+		OrderBy(fullTable.GetColumn("created_timestamp"))
+	auditQuery.Build()
+	println(auditQuery.Query)
+
+	auditQuery = QueryTable[Log](fullTable).
+		Where(fullTable.GetColumn("account_id"), "=", "AND", 0, "").
+		OrderBy(fullTable.GetColumn("created_timestamp")).Build()
+	println(auditQuery.Query)
 }
