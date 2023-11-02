@@ -106,6 +106,8 @@ func generateGroupBy(groupBy []*Column) string {
 		}
 		if c.GroupByName != "" {
 			columns = append(columns, c.GroupByName)
+		} else if c.ForceGroupByValue {
+			columns = append(columns, c.FullName(true))
 		} else {
 			columns = append(columns, c.FullName(false))
 		}
