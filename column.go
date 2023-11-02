@@ -67,9 +67,6 @@ func (c *Column) HasFK() bool {
 func (c *Column) FullName(groupBy bool) string {
 	if groupBy && len(c.GroupByModifier) > 0 {
 		suffix := ""
-		if c.GroupByName != "" {
-			suffix = " AS " + suffix
-		}
 		if strings.Contains(c.GroupByModifier, "*") {
 			return strings.ReplaceAll(c.GroupByModifier, "*", fmt.Sprintf("%s.%s", c.Table, c.Name)) + suffix
 		}
@@ -99,7 +96,7 @@ func (c *Column) GetUpdateStmt(add bool) string {
 
 func (c *Column) GetOrderStmt(groupBy bool) string {
 	name := c.Name
-	if c.GroupByName != "" {
+	if c.GroupByName != "" && groupBy {
 		name = c.GroupByName
 	}
 	if c.OrderAsc {
