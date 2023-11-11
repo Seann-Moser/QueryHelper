@@ -2,6 +2,8 @@ package QueryHelper
 
 import (
 	"database/sql"
+	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -144,4 +146,45 @@ func TestTableCtx(t *testing.T) {
 		Where(fullTable.GetColumn("account_id"), "=", "AND", 0, "").
 		OrderBy(fullTable.GetColumn("created_timestamp")).Build()
 	println(auditQuery.Query)
+}
+
+type Permissions struct {
+	ID               string `json:"id" db:"id" qc:"primary;join;join_name::permission_id;auto_generate_id;"`
+	Name             string `json:"name" db:"name" qc:"update"`
+	System           string `json:"system" db:"system" qc:"update"`
+	Path             string `json:"path" db:"path" qc:"primary;data_type::varchar(512);update"`
+	Methods          string `json:"methods" db:"methods" qc:"primary;update"`
+	UpdatedTimestamp string `json:"updated_timestamp" db:"updated_timestamp" qc:"skip;default::updated_timestamp"`
+	CreatedTimestamp string `json:"created_timestamp" db:"created_timestamp" qc:"skip;default::created_timestamp"`
+	Public           bool   `json:"public" db:"public" qc:"default::false;update"`
+
+	HandlerFunc http.HandlerFunc `db:"-" json:"-"`
+}
+type RolePermissions struct {
+	RoleID           string `json:"role_id" db:"role_id" qc:"primary;join;foreign_key::id;foreign_table::role"`
+	PermissionID     string `json:"permission_id" db:"permission_id" qc:"primary;join;foreign_key::id;foreign_table::permissions"`
+	CreatedTimestamp string `json:"created_timestamp" db:"created_timestamp" qc:"skip;default::created_timestamp"`
+}
+
+func TestTableWhereGroupingCtx(t *testing.T) {
+
+	permissionsTable, err := NewTable[Permissions]("test", QueryTypeSQL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rolePermissionsTable, err := NewTable[RolePermissions]("test", QueryTypeSQL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	permisisonsQuery := QueryTable[Permissions](permissionsTable).
+		Join(rolePermissionsTable.Columns, "LEFT").
+		Where(rolePermissionsTable.GetColumn("role_id"), "in", "AND", 0, strings.Join([]string{}, ",")).
+		Where(permissionsTable.GetColumn("service"), "in", "AND", 0, strings.Join([]string{"", "", "default"}, ",")).
+		Where(permissionsTable.GetColumn("path"), "=", "AND", 0, "").
+		Where(permissionsTable.GetColumn("public"), "=", "AND", 1, true).
+		Where(rolePermissionsTable.GetColumn("role_id"), "is not", "OR", 1, nil).
+		Build()
+
+	println(permisisonsQuery.Query)
 }
