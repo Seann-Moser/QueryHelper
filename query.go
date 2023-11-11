@@ -46,6 +46,14 @@ func (w *WhereStmt) ToString() string {
 	}
 	var formatted string
 	switch strings.TrimSpace(strings.ToLower(tmp)) {
+	case "is not":
+		if w.RightValue == nil {
+			formatted = fmt.Sprintf("%s %s null", column.FullName(false), tmp)
+		}
+	case "is":
+		if w.RightValue == nil {
+			formatted = fmt.Sprintf("%s %s null", column.FullName(false), tmp)
+		}
 	case "not in":
 		fallthrough
 	case "in":
@@ -65,18 +73,18 @@ func generateWhere(whereStatements []*WhereStmt) string {
 	for i, w := range whereStatements {
 		if where := w.ToString(); where != "" {
 
-			if w.Level > previousLevel {
-				stmt += fmt.Sprintf(" %s", generateList("(", w.Level-previousLevel))
-			}
 			if w.Level < previousLevel {
 				stmt += fmt.Sprintf(" %s", generateList(")", previousLevel-w.Level))
 			}
-
 			if i > 0 {
 				if w.JoinOperator == "" {
 					w.JoinOperator = "AND"
 				}
 				stmt += " " + strings.ToUpper(w.JoinOperator)
+			}
+
+			if w.Level > previousLevel {
+				stmt += fmt.Sprintf(" %s", generateList("(", w.Level-previousLevel))
 			}
 
 			stmt += fmt.Sprintf(" %s", w.ToString())
