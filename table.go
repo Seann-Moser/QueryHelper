@@ -383,7 +383,7 @@ func (t *Table[T]) UpdateStatement() string {
 	var setValues []string
 	var whereValues []string
 	for _, e := range t.Columns {
-		if e.Primary {
+		if e.Primary && !e.Update {
 			whereValues = append(whereValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
 		}
 		if !e.Update {
@@ -392,6 +392,10 @@ func (t *Table[T]) UpdateStatement() string {
 		setValues = append(setValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
 	}
 	if len(setValues) == 0 {
+		return ""
+	}
+
+	if len(whereValues) == 0 {
 		return ""
 	}
 	update := fmt.Sprintf("UPDATE %s SET %s WHERE %s",
