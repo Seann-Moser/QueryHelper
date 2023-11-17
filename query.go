@@ -159,6 +159,14 @@ func (q *Query[T]) Join(tableColumns map[string]*Column, joinType string) *Query
 	return q
 }
 
+func (q *Query[T]) JoinColumn(joinType string, tableColumns *Column) *Query[T] {
+	q.JoinStmt = append(q.JoinStmt, &JoinStmt{
+		Columns:  map[string]*Column{tableColumns.Name: tableColumns},
+		JoinType: joinType,
+	})
+	return q
+}
+
 func (q *Query[T]) Where(column *Column, conditional, joinOperator string, level int, value interface{}) *Query[T] {
 	if level < 0 {
 		level = 0

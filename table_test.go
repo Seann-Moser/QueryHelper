@@ -1,22 +1,22 @@
 package QueryHelper
 
 import (
-	"database/sql"
+	"context"
 	"net/http"
 	"strings"
 	"testing"
 )
 
 type FullTestStruct struct {
-	ID               string         `json:"chapter_id" db:"chapter_id" qc:"where:=;delete;auto_generate_id;auto_generate_id_type:base64,join"`
-	Public           bool           `json:"public" db:"public" qc:"default:true;primary"`
-	BookID           string         `json:"book_id" db:"book_id" qc:"primary"`
-	Number           int            `json:"chapter_number" db:"chapter_number" qc:"primary;update;order;group_by_modifier::count"`
-	Language         string         `json:"language" db:"language" qc:"primary;update,order;order_priority:1"`
-	Image            string         `json:"cover_image" db:"cover_image" qc:"update"`
-	UpdatedTimestamp string         `db:"updated_timestamp" json:"updated_timestamp" qc:"skip;default:updated_timestamp" `
-	CreatedTimestamp string         `db:"created_timestamp" json:"created_timestamp" qc:"skip;default:created_timestamp"`
-	TestNull         sql.NullString `db:"null_string" json:"test_null" qc:"null"`
+	ID               string     `json:"chapter_id" db:"chapter_id" qc:"where:=;delete;auto_generate_id;auto_generate_id_type:base64,join"`
+	Public           bool       `json:"public" db:"public" qc:"default:true;primary"`
+	BookID           string     `json:"book_id" db:"book_id" qc:"primary"`
+	Number           int        `json:"chapter_number" db:"chapter_number" qc:"primary;update;order;group_by_modifier::count"`
+	Language         string     `json:"language" db:"language" qc:"primary;update,order;order_priority:1"`
+	Image            string     `json:"cover_image" db:"cover_image" qc:"update"`
+	UpdatedTimestamp string     `db:"updated_timestamp" json:"updated_timestamp" qc:"skip;default:updated_timestamp" `
+	CreatedTimestamp string     `db:"created_timestamp" json:"created_timestamp" qc:"skip;default:created_timestamp"`
+	TestNull         NullString `db:"null_string" json:"test_null" qc:"null"`
 }
 
 type GuestRequests struct {
@@ -68,6 +68,7 @@ func TestNewTable(t *testing.T) {
 
 	query = QueryTable[FullTestStruct](table).Select(table.GetColumn("book_id"), table.GetColumn("number")).Where(table.GetColumn("chapter_id"), "in", "", 2, nil).Where(table.GetColumn("language"), "=", "", 1, nil).GroupBy(table.GetColumn("book_id")).Build()
 
+	table.Insert(context.Background(), nil, FullTestStruct{}, FullTestStruct{}, FullTestStruct{})
 	println(query.Query)
 
 }
@@ -177,6 +178,7 @@ func TestTableWhereGroupingCtx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	permisisonsQuery := QueryTable[Permissions](permissionsTable).
 		Join(rolePermissionsTable.Columns, "LEFT").
 		Where(rolePermissionsTable.GetColumn("role_id"), "in", "AND", 0, strings.Join([]string{}, ",")).
@@ -185,6 +187,6 @@ func TestTableWhereGroupingCtx(t *testing.T) {
 		Where(permissionsTable.GetColumn("public"), "=", "AND", 1, true).
 		Where(rolePermissionsTable.GetColumn("role_id"), "is not", "OR", 1, nil).
 		Build()
-
 	println(permisisonsQuery.Query)
+
 }

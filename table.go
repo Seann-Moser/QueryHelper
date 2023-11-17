@@ -490,7 +490,6 @@ func (t *Table[T]) generateJoinStmt(columns map[string]*Column, JoinType string)
 	if len(columns) == 0 {
 		return ""
 	}
-	var joinStmts []string
 	joinExp := "JOIN"
 	switch strings.ToLower(JoinType) {
 	case "left":
@@ -498,16 +497,26 @@ func (t *Table[T]) generateJoinStmt(columns map[string]*Column, JoinType string)
 	case "right":
 		joinExp = "RIGHT JOIN"
 	}
+	tableJoins := map[string][]string{}
 	for _, column := range columns {
 		name, found := t.HasColumn(column)
 		if !column.Join || !found {
 			continue
 		}
-
-		joinStmt := fmt.Sprintf("%s %s ON %s.%s = %s.%s", joinExp, column.FullTableName(), column.Table, column.Name, t.Name, name)
-		joinStmts = append(joinStmts, joinStmt)
+		if _, found := tableJoins[column.FullTableName()]; !found {
+			tableJoins[column.FullTableName()] = []string{}
+			joinStmt := fmt.Sprintf("%s %s ON %s.%s = %s.%s", joinExp, column.FullTableName(), column.Table, column.Name, t.Name, name)
+			tableJoins[column.FullTableName()] = append(tableJoins[column.FullTableName()], joinStmt)
+		} else {
+			joinStmt := fmt.Sprintf("%s.%s = %s.%s", column.Table, column.Name, t.Name, name)
+			tableJoins[column.FullTableName()] = append(tableJoins[column.FullTableName()], joinStmt)
+		}
 	}
-	return strings.Join(joinStmts, " ")
+	output := ""
+	for _, v := range tableJoins {
+		output += strings.Join(v, " AND ") + "\n"
+	}
+	return output
 }
 
 func (t *Table[T]) generateWhereStmt(columns map[string]*Column) string {
@@ -528,7 +537,6 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 	if db == nil {
 		return "", nil
 	}
-
 	if t.IsAutoGenerateID() {
 		generateIds := t.GenerateID()
 		args := map[string]interface{}{}
@@ -547,8 +555,8 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 		err := db.ExecContext(ctx, t.InsertStatement(len(s)), args)
 		return generateIds[t.GetGenerateID()[0].Name], err
 	}
-	args, err := combineStructsWithPrefix[T](s...)
 
+	args, err := combineStructsWithPrefix[T](s...)
 	err = db.ExecContext(ctx, t.InsertStatement(len(s)), args)
 	return "", err
 }
