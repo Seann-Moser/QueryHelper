@@ -537,7 +537,6 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 	if db == nil {
 		return "", nil
 	}
-
 	if t.IsAutoGenerateID() {
 		generateIds := t.GenerateID()
 		args := map[string]interface{}{}
@@ -556,8 +555,8 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 		err := db.ExecContext(ctx, t.InsertStatement(len(s)), args)
 		return generateIds[t.GetGenerateID()[0].Name], err
 	}
-	args, err := combineStructsWithPrefix[T](s...)
 
+	args, err := combineStructsWithPrefix[T](s...)
 	err = db.ExecContext(ctx, t.InsertStatement(len(s)), args)
 	return "", err
 }

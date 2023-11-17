@@ -138,9 +138,11 @@ func combineStructs(i ...interface{}) (map[string]interface{}, error) {
 
 func JoinMapsWithPrefix[T any](prefix string, m ...map[string]T) map[string]T {
 	output := map[string]T{}
-	for _, currentMap := range m {
+	for index, currentMap := range m {
 		for k, v := range currentMap {
-			if _, found := output[prefix+k]; !found {
+			if index == 0 {
+				output[k] = v
+			} else if _, found := output[prefix+k]; !found {
 				output[prefix+k] = v
 			}
 		}
@@ -212,7 +214,7 @@ func (r NullString) MarshalJSON() ([]byte, error) {
 	if r.Valid {
 		return json.Marshal(r.String)
 	} else {
-		return json.Marshal(nil)
+		return nil, nil
 	}
 }
 
@@ -224,7 +226,7 @@ func (r NullInt64) MarshalJSON() ([]byte, error) {
 	if r.Valid {
 		return json.Marshal(r.Int64)
 	} else {
-		return json.Marshal(nil)
+		return nil, nil
 	}
 }
 
@@ -236,7 +238,7 @@ func (r NullBool) MarshalJSON() ([]byte, error) {
 	if r.Valid {
 		return json.Marshal(r.Bool)
 	} else {
-		return json.Marshal(nil)
+		return nil, nil
 	}
 }
 
@@ -248,7 +250,7 @@ func (r NullFloat64) MarshalJSON() ([]byte, error) {
 	if r.Valid {
 		return json.Marshal(r.Float64)
 	} else {
-		return json.Marshal(nil)
+		return nil, nil
 	}
 }
 
@@ -260,6 +262,6 @@ func (r NullTime) MarshalJSON() ([]byte, error) {
 	if r.Valid {
 		return json.Marshal(r.Time)
 	} else {
-		return json.Marshal(nil)
+		return nil, nil
 	}
 }
