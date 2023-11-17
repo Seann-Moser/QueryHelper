@@ -177,6 +177,7 @@ func TestTableWhereGroupingCtx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	permisisonsQuery := QueryTable[Permissions](permissionsTable).
 		Join(rolePermissionsTable.Columns, "LEFT").
 		Where(rolePermissionsTable.GetColumn("role_id"), "in", "AND", 0, strings.Join([]string{}, ",")).
@@ -185,6 +186,6 @@ func TestTableWhereGroupingCtx(t *testing.T) {
 		Where(permissionsTable.GetColumn("public"), "=", "AND", 1, true).
 		Where(rolePermissionsTable.GetColumn("role_id"), "is not", "OR", 1, nil).
 		Build()
-
 	println(permisisonsQuery.Query)
+
 }
