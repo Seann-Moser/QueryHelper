@@ -1,6 +1,6 @@
 module github.com/Seann-Moser/QueryHelper
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/Seann-Moser/ctx_cache v1.0.0
