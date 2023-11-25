@@ -3,8 +3,8 @@ module github.com/Seann-Moser/QueryHelper
 go 1.21.4
 
 require (
-	github.com/Seann-Moser/ctx_cache v1.0.0
-	github.com/google/uuid v1.3.1
+	github.com/Seann-Moser/ctx_cache v1.0.1
+	github.com/google/uuid v1.4.0
 	github.com/jmoiron/sqlx v1.3.4
 )
 
