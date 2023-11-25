@@ -242,19 +242,14 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 		q.Build()
 	}
 	cacheKey := q.GetCacheKey(args)
-	if !q.skipCache {
-		if q.Cache != nil {
-			data, err := ctx_cache.GetFromCache[[]*T](ctx, q.Cache, cacheKey)
-			if err == nil && len(*data) > 0 {
-				return *data, nil
-			}
-		} else {
-			data, err := ctx_cache.Get[[]*T](ctx, cacheKey)
-			if err == nil && len(*data) > 0 {
-				return *data, nil
-			}
+
+	if q.Cache != nil {
+		data, err := ctx_cache.GetFromCache[[]*T](ctx, q.Cache, cacheKey)
+		if err == nil && len(*data) > 0 {
+			return *data, nil
 		}
 	}
+
 	data, err := q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
 	if err != nil {
 		return nil, err
@@ -262,14 +257,6 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 
 	if q.Cache != nil {
 		_ = ctx_cache.SetFromCache[[]*T](ctx, q.Cache, cacheKey, data)
-		//if err == nil && len(data) > 0 {
-		//	return nil, err
-		//}
-	} else {
-		_ = ctx_cache.Set[[]*T](ctx, cacheKey, data)
-		//if err == nil && len(data) > 0 {
-		//	return nil, err
-		//}
 	}
 
 	return data, nil
