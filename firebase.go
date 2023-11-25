@@ -2,13 +2,12 @@ package QueryHelper
 
 import (
 	"context"
-	firebase "firebase.google.com/go/v4/db"
 )
 
 var _ DB = &FirebaseDB{}
 
 type FirebaseDB struct {
-	client *firebase.Client
+	//client *firebase.Client
 }
 
 func NewFirebaseDB() *FirebaseDB {

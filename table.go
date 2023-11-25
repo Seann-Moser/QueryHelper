@@ -227,7 +227,7 @@ func (t *Table[T]) GetSelectableColumns(useAs bool, groupBy bool, names ...*Colu
 
 	for _, e := range t.Columns {
 		if e.GroupByName != "" && groupBy {
-			suffix = fmt.Sprintf("%s", e.GroupByName)
+			suffix = e.GroupByName
 		} else if useAs {
 			suffix = fmt.Sprintf(" AS %s", e.Name)
 		} else {
@@ -561,6 +561,9 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 	}
 
 	args, err := combineStructsWithPrefix[T](s...)
+	if err != nil {
+		return "", err
+	}
 	err = db.ExecContext(ctx, t.InsertStatement(len(s)), args)
 	return "", err
 }
