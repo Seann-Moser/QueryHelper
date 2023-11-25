@@ -68,7 +68,7 @@ func TestNewTable(t *testing.T) {
 
 	query = QueryTable[FullTestStruct](table).Select(table.GetColumn("book_id"), table.GetColumn("number")).Where(table.GetColumn("chapter_id"), "in", "", 2, nil).Where(table.GetColumn("language"), "=", "", 1, nil).GroupBy(table.GetColumn("book_id")).Build()
 
-	table.Insert(context.Background(), nil, FullTestStruct{}, FullTestStruct{}, FullTestStruct{})
+	_, _ = table.Insert(context.Background(), nil, FullTestStruct{}, FullTestStruct{}, FullTestStruct{})
 	println(query.Query)
 
 }
