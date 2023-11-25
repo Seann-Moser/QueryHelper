@@ -2,8 +2,12 @@ package QueryHelper
 
 import (
 	"context"
+	"crypto/md5"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
+	"github.com/Seann-Moser/ctx_cache"
+	"sort"
 	"strings"
 )
 
@@ -18,6 +22,7 @@ type Query[T any] struct {
 
 	LimitCount int
 
+	Cache ctx_cache.Cache
 	Query string
 }
 
@@ -210,6 +215,11 @@ func (q *Query[T]) Limit(limit int) *Query[T] {
 	return q
 }
 
+func (q *Query[T]) SetCache(cache ctx_cache.Cache) *Query[T] {
+	q.Cache = cache
+	return q
+}
+
 func (q *Query[T]) Build() *Query[T] {
 	switch q.FromTable.QueryType {
 	case QueryTypeFireBase:
@@ -225,7 +235,36 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 	if len(q.Query) == 0 {
 		q.Build()
 	}
-	return q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
+	cacheKey := q.GetCacheKey(args)
+	if q.Cache != nil {
+		data, err := ctx_cache.GetFromCache[[]*T](ctx, q.Cache, cacheKey)
+		if err == nil && len(*data) > 0 {
+			return *data, nil
+		}
+	} else {
+		data, err := ctx_cache.Get[[]*T](ctx, cacheKey)
+		if err == nil && len(*data) > 0 {
+			return *data, nil
+		}
+	}
+	data, err := q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
+	if err != nil {
+		return nil, err
+	}
+
+	if q.Cache != nil {
+		_ = ctx_cache.SetFromCache[[]*T](ctx, q.Cache, cacheKey, data)
+		//if err == nil && len(data) > 0 {
+		//	return nil, err
+		//}
+	} else {
+		_ = ctx_cache.Set[[]*T](ctx, cacheKey, data)
+		//if err == nil && len(data) > 0 {
+		//	return nil, err
+		//}
+	}
+
+	return data, nil
 }
 
 func (q *Query[T]) Args(args ...interface{}) map[string]interface{} {
@@ -243,6 +282,38 @@ func (q *Query[T]) Args(args ...interface{}) map[string]interface{} {
 	return arg
 }
 
+func (q *Query[T]) GetCacheKey(args ...interface{}) string {
+	var key []string
+	for _, k := range q.SelectColumns {
+		key = append(key, k.Name)
+	}
+	for _, k := range q.WhereStmts {
+		key = append(key, k.ToString())
+	}
+	for _, k := range q.GroupByStmt {
+		key = append(key, k.Name)
+	}
+	for _, k := range q.OrderByStmt {
+		key = append(key, k.Name)
+	}
+	argsData := q.Args(args)
+	keys := make([]string, 0, len(argsData))
+
+	for k := range argsData {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		keys = append(keys, safeString(argsData[k]))
+	}
+
+	return GetMD5Hash(strings.Join(key, ""))
+}
+func GetMD5Hash(text string) string {
+	hash := md5.Sum([]byte(text))
+	return hex.EncodeToString(hash[:])
+}
 func (q *Query[T]) buildSqlQuery() *Query[T] {
 	var isGroupBy = len(q.GroupByStmt) > 0
 	var query string
