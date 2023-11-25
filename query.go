@@ -22,8 +22,9 @@ type Query[T any] struct {
 
 	LimitCount int
 
-	Cache ctx_cache.Cache
-	Query string
+	Cache     ctx_cache.Cache
+	Query     string
+	skipCache bool
 }
 
 type JoinStmt struct {
@@ -151,6 +152,11 @@ func (q *Query[T]) Select(columns ...*Column) *Query[T] {
 	return q
 }
 
+func (q *Query[T]) SkipCache() *Query[T] {
+	q.skipCache = true
+	return q
+}
+
 func (q *Query[T]) From(query *Query[T]) *Query[T] {
 	q.FromQuery = query
 	return q
@@ -236,15 +242,17 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 		q.Build()
 	}
 	cacheKey := q.GetCacheKey(args)
-	if q.Cache != nil {
-		data, err := ctx_cache.GetFromCache[[]*T](ctx, q.Cache, cacheKey)
-		if err == nil && len(*data) > 0 {
-			return *data, nil
-		}
-	} else {
-		data, err := ctx_cache.Get[[]*T](ctx, cacheKey)
-		if err == nil && len(*data) > 0 {
-			return *data, nil
+	if !q.skipCache {
+		if q.Cache != nil {
+			data, err := ctx_cache.GetFromCache[[]*T](ctx, q.Cache, cacheKey)
+			if err == nil && len(*data) > 0 {
+				return *data, nil
+			}
+		} else {
+			data, err := ctx_cache.Get[[]*T](ctx, cacheKey)
+			if err == nil && len(*data) > 0 {
+				return *data, nil
+			}
 		}
 	}
 	data, err := q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
