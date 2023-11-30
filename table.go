@@ -404,6 +404,30 @@ func (t *Table[T]) UpdateStatement() string {
 	return update
 }
 
+func DeleteStatement(fullTableName string, columns map[string]*Column) string {
+	var whereValues []string
+	for _, e := range columns {
+		if e.Primary {
+			whereValues = append(whereValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
+			continue
+		}
+		if e.Delete {
+			return fmt.Sprintf("DELETE FROM %s WHERE %s = :%s", fullTableName, e.Name, e.Name)
+		}
+	}
+	return fmt.Sprintf("DELETE FROM %s WHERE %s", fullTableName, strings.Join(whereValues, " AND "))
+}
+
+func (t *Table[T]) DeleteWithColumns(ctx context.Context, fullTableName string, columns map[string]*Column, s T) error {
+	if t.db == nil {
+		return nil
+	}
+	if c := t.GetCommonColumns(columns); len(c) == 0 {
+		return nil
+	}
+	return t.db.ExecContext(ctx, DeleteStatement(fullTableName, columns), s)
+}
+
 func (t *Table[T]) DeleteStatement() string {
 	var whereValues []string
 	for _, e := range t.Columns {
