@@ -1,12 +1,26 @@
 package QueryHelper
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"go.opencensus.io/tag"
 	"strconv"
 	"strings"
 )
+
+var (
+	QueryNameTag = tag.MustNewKey("query_name")
+)
+
+func CtxWithQueryTag(ctx context.Context, queryName string) context.Context {
+	newCtx, err := tag.New(ctx, tag.Insert(QueryNameTag, queryName))
+	if err != nil {
+		return ctx
+	}
+	return newCtx
+}
 
 func safeString(d interface{}) string {
 	switch v := d.(type) {

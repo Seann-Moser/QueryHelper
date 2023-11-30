@@ -33,7 +33,7 @@ func GetColumnFromTag(name, data string, p reflect.Type) (*Column, error) {
 			value = strings.TrimSpace(v[1])
 		}
 		switch strings.ToLower(key) {
-		case "where", "join_name", "data_type", "default", "where_join", "foreign_key", "foreign_table", "auto_generate_id_type", "group_by_modifier", "group_by_name":
+		case "where", "join_name", "data_type", "default", "where_join", "foreign_key", "foreign_table", "foreign_schema", "auto_generate_id_type", "group_by_modifier", "group_by_name":
 			if key == "data_type" {
 				con["data_type"] = value
 			}

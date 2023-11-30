@@ -12,6 +12,7 @@ import (
 )
 
 type Query[T any] struct {
+	Name          string
 	SelectColumns []*Column
 	FromTable     *Table[T]
 	FromQuery     *Query[T]
@@ -133,6 +134,7 @@ func generateGroupBy(groupBy []*Column) string {
 func QueryTable[T any](table *Table[T]) *Query[T] {
 	return &Query[T]{
 		SelectColumns: []*Column{},
+		Name:          "",
 		FromTable:     table,
 		FromQuery:     nil,
 		JoinStmt:      make([]*JoinStmt, 0),
@@ -236,11 +238,37 @@ func (q *Query[T]) Build() *Query[T] {
 	}
 	return q
 }
+func (q *Query[T]) SetName(name string) *Query[T] {
+	q.Name = name
+	return q
+}
+func (q *Query[T]) getName() string {
+	if len(q.Name) != 0 {
+		return q.Name
+	}
+	args := []string{
+		q.FromTable.Name,
+	}
+	if len(q.WhereStmts) > 0 {
+		args = append(args, "where")
+	}
+	for _, w := range q.WhereStmts {
+		args = append(args, w.LeftValue.Name)
+	}
+	if len(q.GroupByStmt) > 0 {
+		args = append(args, "group by")
+	}
+	for _, w := range q.GroupByStmt {
+		args = append(args, w.Name)
+	}
 
+	return strings.ToLower(strings.Join(args, "_"))
+}
 func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, error) {
 	if len(q.Query) == 0 {
 		q.Build()
 	}
+	ctx = CtxWithQueryTag(ctx, q.getName())
 	cacheKey := q.GetCacheKey(args)
 
 	if q.Cache != nil {

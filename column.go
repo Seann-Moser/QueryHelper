@@ -30,12 +30,12 @@ type Column struct {
 	Type    string `json:"data_type"`
 	Default string `json:"default"`
 
-	ForeignKey   string `json:"foreign_key"`
-	ForeignTable string `json:"foreign_table"`
-
-	WhereJoin string `json:"where_join"`
-	Where     string `json:"where"`
-	JoinName  string `json:"join_name"`
+	ForeignKey    string `json:"foreign_key"`
+	ForeignTable  string `json:"foreign_table"`
+	ForeignSchema string `json:"foreign_schema`
+	WhereJoin     string `json:"where_join"`
+	Where         string `json:"where"`
+	JoinName      string `json:"join_name"`
 
 	AutoGenerateIDType string `json:"auto_generate_id_type"`
 }
@@ -80,9 +80,21 @@ func (c *Column) FullTableName() string {
 	return fmt.Sprintf("%s.%s", c.Dataset, c.Table)
 }
 
+func (c *Column) GetFKReference() string {
+	if !c.HasFK() {
+		return ""
+	}
+	reference := ""
+	if len(c.ForeignSchema) > 0 {
+		reference = c.ForeignSchema + "."
+	}
+	reference += fmt.Sprintf("%s(%s)", c.ForeignTable, c.ForeignKey)
+	return reference
+}
+
 func (c *Column) GetFK() string {
 	if c.HasFK() {
-		return fmt.Sprintf("\n\tFOREIGN KEY (%s) REFERENCES %s(%s) ON DELETE CASCADE on update cascade", c.Name, c.ForeignTable, c.ForeignKey)
+		return fmt.Sprintf("\n\tFOREIGN KEY (%s) REFERENCES %s ON DELETE CASCADE on update cascade", c.Name, c.GetFKReference())
 	}
 	return ""
 }
