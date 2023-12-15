@@ -9,14 +9,16 @@ import (
 	"github.com/Seann-Moser/ctx_cache"
 	"sort"
 	"strings"
+	"sync"
 )
 
 type CacheMonitor struct {
 	TableCache map[string]map[string]string
-	ctx_cache.Cache
-	signal chan string
+	Cache      ctx_cache.Cache
+	signal     chan string
 }
 
+var syncMutex = &sync.RWMutex{}
 var TableCache map[string]map[string]string = map[string]map[string]string{}
 var tableUpdateSignal chan string = make(chan string)
 
@@ -39,9 +41,12 @@ func (cm *CacheMonitor) Start(ctx context.Context) {
 				if !ok {
 					return
 				}
-				for _, v := range cm.TableCache[v] {
-					_ = cm.Cache.DeleteKey(ctx, v)
+				syncMutex.Lock()
+				for _, keys := range cm.TableCache[v] {
+					_ = cm.Cache.DeleteKey(ctx, keys)
 				}
+				delete(cm.TableCache, v)
+				syncMutex.Unlock()
 			}
 		}
 	}()
@@ -50,6 +55,7 @@ func (cm *CacheMonitor) Start(ctx context.Context) {
 
 type Query[T any] struct {
 	Name          string
+	err           error
 	SelectColumns []*Column
 	FromTable     *Table[T]
 	FromQuery     *Query[T]
@@ -77,13 +83,13 @@ type WhereStmt struct {
 	JoinOperator string
 }
 
-func GetQuery[T any](ctx context.Context) (*Query[T], error) {
+func GetQuery[T any](ctx context.Context) *Query[T] {
 	table, err := GetTableCtx[T](ctx)
 	if err != nil {
-		return nil, err
+		return &Query[T]{err: err}
 	}
 	q := QueryTable[T](table)
-	return q, nil
+	return q
 }
 
 func (w *WhereStmt) ToString() string {
@@ -210,6 +216,17 @@ func (q *Query[T]) From(query *Query[T]) *Query[T] {
 	return q
 }
 
+func (q *Query[T]) Column(name string) *Column {
+	if q.err != nil {
+		return nil
+	}
+	c := q.FromTable.GetColumn(name)
+	if c == nil {
+		q.err = fmt.Errorf("missing column from table(%s) %s", q.FromTable.FullTableName(), name)
+	}
+	return c
+}
+
 func (q *Query[T]) Join(tableColumns map[string]*Column, joinType string) *Query[T] {
 	q.JoinStmt = append(q.JoinStmt, &JoinStmt{
 		Columns:  tableColumns,
@@ -311,12 +328,17 @@ func (q *Query[T]) getName() string {
 	return strings.ToLower(strings.Join(args, "_"))
 }
 func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, error) {
+	if q.err != nil {
+		return nil, q.err
+	}
 	if len(q.Query) == 0 {
 		q.Build()
 	}
 	ctx = CtxWithQueryTag(ctx, q.getName())
 	cacheKey := q.GetCacheKey(args)
+	syncMutex.RLock()
 	TableCache[q.FromTable.FullTableName()][cacheKey] = ""
+	syncMutex.RUnlock()
 	if q.Cache != nil {
 		data, err := ctx_cache.GetFromCache[[]*T](ctx, q.Cache, cacheKey)
 		if err == nil && len(*data) > 0 {
@@ -384,6 +406,9 @@ func GetMD5Hash(text string) string {
 	return hex.EncodeToString(hash[:])
 }
 func (q *Query[T]) buildSqlQuery() *Query[T] {
+	if q.err != nil {
+		return q
+	}
 	var isGroupBy = len(q.GroupByStmt) > 0
 	var query string
 	selectColumns := q.FromTable.GetSelectableColumns(isGroupBy, isGroupBy, q.SelectColumns...)
