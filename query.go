@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 type CacheMonitor struct {
@@ -33,10 +34,23 @@ func NewCacheMonitor(ctx context.Context) *CacheMonitor {
 
 func (cm *CacheMonitor) Start(ctx context.Context) {
 	go func() {
+		tick := time.NewTicker(5 * time.Minute)
 		for {
 			select {
 			case <-ctx.Done():
 				return
+			case <-tick.C:
+				go func() {
+					for table, tables := range cm.TableCache {
+						for _, key := range tables {
+							if _, err := cm.Cache.GetCache(ctx, key); err == ctx_cache.ErrCacheMiss {
+								syncMutex.Lock()
+								delete(cm.TableCache[table], key)
+								syncMutex.Unlock()
+							}
+						}
+					}
+				}()
 			case v, ok := <-cm.signal:
 				if !ok {
 					return
