@@ -392,6 +392,7 @@ func (q *Query[T]) Args(args ...interface{}) map[string]interface{} {
 
 func (q *Query[T]) GetCacheKey(args ...interface{}) string {
 	var key []string
+	key = append(key, q.FromTable.FullTableName())
 	for _, k := range q.SelectColumns {
 		key = append(key, k.Name)
 	}
@@ -405,15 +406,14 @@ func (q *Query[T]) GetCacheKey(args ...interface{}) string {
 		key = append(key, k.Name)
 	}
 	argsData := q.Args(args)
-	keys := make([]string, 0, len(argsData))
 
 	for k := range argsData {
-		keys = append(keys, k)
+		key = append(key, k)
 	}
-	sort.Strings(keys)
+	sort.Strings(key)
 
-	for _, k := range keys {
-		keys = append(keys, safeString(argsData[k]))
+	for _, k := range key {
+		key = append(key, safeString(argsData[k]))
 	}
 
 	return GetMD5Hash(strings.Join(key, ""))
