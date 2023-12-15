@@ -32,7 +32,7 @@ type Column struct {
 
 	ForeignKey    string `json:"foreign_key"`
 	ForeignTable  string `json:"foreign_table"`
-	ForeignSchema string `json:"foreign_schema`
+	ForeignSchema string `json:"foreign_schema"`
 	WhereJoin     string `json:"where_join"`
 	Where         string `json:"where"`
 	JoinName      string `json:"join_name"`
