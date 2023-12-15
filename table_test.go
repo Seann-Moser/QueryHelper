@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 type FullTestStruct struct {
@@ -49,6 +50,21 @@ type Log struct {
 	AccountID        string `json:"account_id" db:"account_id" qc:"primary;join;join_name::account_id"`
 	UserID           string `json:"user_id" db:"user_id" qc:"primary;data_type::varchar(512);join;join_name::user_id"`
 	Service          string `json:"service" db:"service"`
+	LogType          string `json:"log_type" db:"log_type"`
+	Data             string `json:"data" db:"data" qc:"data_type::text"`
+	CreatedTimestamp string `json:"created_timestamp" db:"created_timestamp" qc:"skip;default::created_timestamp;group_by_modifier::DATE(*);group_by_name::created_date"`
+}
+
+type AuditLog struct {
+	ID               string `json:"id" db:"id" qc:"primary;join;join_name::audit_id;auto_generate_id;group_by_modifier::count"`
+	AccountID        string `json:"account_id" db:"account_id" qc:"primary;join;join_name::account_id"`
+	UserID           string `json:"user_id" db:"user_id" qc:"primary;data_type::varchar(512);join;join_name::user_id"`
+	Service          string `json:"service" db:"service"`
+	Role             string `json:"role" db:"role"`
+	Path             string `json:"path" db:"path"`
+	Method           string `json:"method" db:"method"`
+	Latency          int64  `json:"latency" db:"latency" qc:"data_type::bigint"`
+	StatusCode       int64  `json:"status_code" db:"status_code"`
 	LogType          string `json:"log_type" db:"log_type"`
 	Data             string `json:"data" db:"data" qc:"data_type::text"`
 	CreatedTimestamp string `json:"created_timestamp" db:"created_timestamp" qc:"skip;default::created_timestamp;group_by_modifier::DATE(*);group_by_name::created_date"`
@@ -188,5 +204,26 @@ func TestTableWhereGroupingCtx(t *testing.T) {
 		Where(rolePermissionsTable.GetColumn("role_id"), "is not", "OR", 1, nil).
 		Build()
 	println(permisisonsQuery.Query)
+
+}
+
+func TestQuery_GroupBy(t *testing.T) {
+	auditTable, err := NewTable[AuditLog]("audit_log", QueryTypeSQL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auditQuery := QueryTable[AuditLog](auditTable).
+		Select(
+			auditTable.GetColumn("id"),
+			auditTable.GetColumn("account_id"),
+			auditTable.GetColumn("log_type"),
+			auditTable.GetColumn("created_timestamp"),
+		).
+		Where(auditTable.GetColumn("account_id"), "=", "AND", 0, "test").
+		GroupBy(auditTable.GetColumn("account_id"), auditTable.GetColumn("created_timestamp"))
+
+	auditQuery.Where(auditTable.GetColumn("created_timestamp"), ">=", "AND", 0, time.Now().Format("2006-01-02T15:04:05"))
+	auditQuery.Build()
+	println(auditQuery.Query)
 
 }

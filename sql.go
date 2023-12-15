@@ -81,6 +81,7 @@ func (s *SqlDB) QueryContext(ctx context.Context, query string, args interface{}
 }
 
 func (s *SqlDB) ExecContext(ctx context.Context, query string, args interface{}) error {
+
 	_, err := s.sql.NamedExecContext(ctx, query, args)
 	return err
 }

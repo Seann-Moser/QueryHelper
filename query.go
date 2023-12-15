@@ -11,6 +11,43 @@ import (
 	"strings"
 )
 
+type CacheMonitor struct {
+	TableCache map[string]map[string]string
+	ctx_cache.Cache
+	signal chan string
+}
+
+var TableCache map[string]map[string]string = map[string]map[string]string{}
+var tableUpdateSignal chan string = make(chan string)
+
+func NewCacheMonitor(ctx context.Context) *CacheMonitor {
+	cm := &CacheMonitor{
+		TableCache: TableCache,
+		Cache:      ctx_cache.GetCacheFromContext(ctx),
+		signal:     tableUpdateSignal,
+	}
+	return cm
+}
+
+func (cm *CacheMonitor) Start(ctx context.Context) {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case v, ok := <-cm.signal:
+				if !ok {
+					return
+				}
+				for _, v := range cm.TableCache[v] {
+					_ = cm.Cache.DeleteKey(ctx, v)
+				}
+			}
+		}
+	}()
+
+}
+
 type Query[T any] struct {
 	Name          string
 	SelectColumns []*Column
@@ -38,6 +75,15 @@ type WhereStmt struct {
 	RightValue   interface{}
 	Level        int
 	JoinOperator string
+}
+
+func GetQuery[T any](ctx context.Context) (*Query[T], error) {
+	table, err := GetTableCtx[T](ctx)
+	if err != nil {
+		return nil, err
+	}
+	q := QueryTable[T](table)
+	return q, nil
 }
 
 func (w *WhereStmt) ToString() string {
@@ -270,7 +316,7 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 	}
 	ctx = CtxWithQueryTag(ctx, q.getName())
 	cacheKey := q.GetCacheKey(args)
-
+	TableCache[q.FromTable.FullTableName()][cacheKey] = ""
 	if q.Cache != nil {
 		data, err := ctx_cache.GetFromCache[[]*T](ctx, q.Cache, cacheKey)
 		if err == nil && len(*data) > 0 {
