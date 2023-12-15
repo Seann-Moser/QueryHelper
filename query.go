@@ -337,6 +337,9 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 	ctx = CtxWithQueryTag(ctx, q.getName())
 	cacheKey := q.GetCacheKey(args)
 	syncMutex.RLock()
+	if _, found := TableCache[q.FromTable.FullTableName()]; !found {
+		TableCache[q.FromTable.FullTableName()] = map[string]string{}
+	}
 	TableCache[q.FromTable.FullTableName()][cacheKey] = ""
 	syncMutex.RUnlock()
 	if q.Cache != nil {
