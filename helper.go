@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go.opencensus.io/tag"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -20,6 +21,22 @@ func CtxWithQueryTag(ctx context.Context, queryName string) context.Context {
 		return ctx
 	}
 	return newCtx
+}
+
+func GetValueFromStructArray[T any](key string, arr ...T) []string {
+	var output []string
+	for _, i := range arr {
+		ps := reflect.ValueOf(i)
+		// struct
+		s := ps.Elem()
+		if s.Kind() == reflect.Struct {
+			f := s.FieldByName(key)
+			if f.IsValid() {
+				output = append(output, f.String())
+			}
+		}
+	}
+	return output
 }
 
 func safeString(d interface{}) string {
