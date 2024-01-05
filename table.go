@@ -98,6 +98,16 @@ func ToSnakeCase(str string) string {
 	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
 	return strings.ToLower(snake)
 }
+func (t *Table[T]) GetPrimary() []*Column {
+	var primaryColumns []*Column
+	for _, c := range t.Columns {
+		if c.Primary {
+			primaryColumns = append(primaryColumns, c)
+		}
+
+	}
+	return primaryColumns
+}
 
 func (t *Table[T]) GetColumn(name string) *Column {
 	if column, found := t.Columns[ToSnakeCase(name)]; found {

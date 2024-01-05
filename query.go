@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/Seann-Moser/ctx_cache"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -77,8 +78,8 @@ type Query[T any] struct {
 	WhereStmts    []*WhereStmt
 	GroupByStmt   []*Column
 	OrderByStmt   []*Column
-
-	LimitCount int
+	MapKeyColumns []*Column
+	LimitCount    int
 
 	Cache     ctx_cache.Cache
 	Query     string
@@ -199,15 +200,20 @@ func generateGroupBy(groupBy []*Column) string {
 
 func QueryTable[T any](table *Table[T]) *Query[T] {
 	return &Query[T]{
-		SelectColumns: []*Column{},
 		Name:          "",
+		err:           nil,
+		SelectColumns: []*Column{},
 		FromTable:     table,
 		FromQuery:     nil,
 		JoinStmt:      make([]*JoinStmt, 0),
 		WhereStmts:    make([]*WhereStmt, 0),
 		GroupByStmt:   make([]*Column, 0),
 		OrderByStmt:   make([]*Column, 0),
+		MapKeyColumns: make([]*Column, 0),
+		LimitCount:    0,
+		Cache:         nil,
 		Query:         "",
+		skipCache:     false,
 	}
 }
 func (q *Query[T]) Select(columns ...*Column) *Query[T] {
@@ -254,6 +260,14 @@ func (q *Query[T]) JoinColumn(joinType string, tableColumns *Column) *Query[T] {
 		Columns:  map[string]*Column{tableColumns.Name: tableColumns},
 		JoinType: joinType,
 	})
+	return q
+}
+
+func (q *Query[T]) MapColumns(column ...*Column) *Query[T] {
+	if column == nil {
+		return q
+	}
+	q.MapKeyColumns = append(q.MapKeyColumns, column...)
 	return q
 }
 
@@ -341,6 +355,34 @@ func (q *Query[T]) getName() string {
 
 	return strings.ToLower(strings.Join(args, "_"))
 }
+
+func (q *Query[T]) RunMap(ctx context.Context, db DB, args ...interface{}) (map[string]*T, error) {
+	rows, err := q.Run(ctx, db, args)
+	if err != nil {
+		return nil, err
+	}
+	if len(q.MapKeyColumns) == 0 {
+		q.MapKeyColumns = append(q.MapKeyColumns, q.FromTable.GetPrimary()...)
+	}
+	m := map[string]*T{}
+
+	for _, row := range rows {
+		// pointer to struct - addressable
+		ps := reflect.ValueOf(row)
+		// struct
+		s := ps.Elem()
+		for _, column := range q.MapKeyColumns {
+			if s.Kind() == reflect.Struct {
+				f := s.FieldByName(column.Name)
+				if f.IsValid() {
+					m[f.String()] = row
+				}
+			}
+		}
+	}
+	return m, err
+}
+
 func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, error) {
 	if q.err != nil {
 		return nil, q.err
