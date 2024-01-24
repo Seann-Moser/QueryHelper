@@ -92,7 +92,6 @@ func convertTypeToSql(name string, v reflect.Type) string {
 	case reflect.Bool:
 		return TableTypeBool
 	default:
-
 		return TableTypeText
 	}
 }

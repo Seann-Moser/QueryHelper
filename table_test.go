@@ -56,18 +56,19 @@ type Log struct {
 }
 
 type AuditLog struct {
-	ID               string `json:"id" db:"id" qc:"primary;join;join_name::audit_id;auto_generate_id;group_by_modifier::count"`
-	AccountID        string `json:"account_id" db:"account_id" qc:"primary;join;join_name::account_id"`
-	UserID           string `json:"user_id" db:"user_id" qc:"primary;data_type::varchar(512);join;join_name::user_id"`
-	Service          string `json:"service" db:"service"`
-	Role             string `json:"role" db:"role"`
-	Path             string `json:"path" db:"path"`
-	Method           string `json:"method" db:"method"`
-	Latency          int64  `json:"latency" db:"latency" qc:"data_type::bigint"`
-	StatusCode       int64  `json:"status_code" db:"status_code"`
-	LogType          string `json:"log_type" db:"log_type"`
-	Data             string `json:"data" db:"data" qc:"data_type::text"`
-	CreatedTimestamp string `json:"created_timestamp" db:"created_timestamp" qc:"skip;default::created_timestamp;group_by_modifier::DATE(*);group_by_name::created_date"`
+	ID               string   `json:"id" db:"id" qc:"primary;join;join_name::audit_id;auto_generate_id;group_by_modifier::count"`
+	AccountID        string   `json:"account_id" db:"account_id" qc:"primary;join;join_name::account_id"`
+	UserID           string   `json:"user_id" db:"user_id" qc:"primary;data_type::varchar(512);join;join_name::user_id"`
+	Service          string   `json:"service" db:"service"`
+	Role             string   `json:"role" db:"role"`
+	Path             string   `json:"path" db:"path"`
+	Method           string   `json:"method" db:"method"`
+	Latency          int64    `json:"latency" db:"latency" qc:"data_type::bigint"`
+	StatusCode       int64    `json:"status_code" db:"status_code"`
+	LogType          string   `json:"log_type" db:"log_type"`
+	Answsers         []string `json:"answsers" db:"anwsers"`
+	Data             string   `json:"data" db:"data" qc:"data_type::text"`
+	CreatedTimestamp string   `json:"created_timestamp" db:"created_timestamp" qc:"skip;default::created_timestamp;group_by_modifier::DATE(*);group_by_name::created_date"`
 }
 
 func TestNewTable(t *testing.T) {
