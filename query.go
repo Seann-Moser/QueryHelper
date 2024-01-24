@@ -367,7 +367,7 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 func (q *Query[T]) Args(args ...interface{}) map[string]interface{} {
 	whereArgs := map[string]interface{}{}
 	for _, where := range q.WhereStmts {
-		if k, arg := where.GetArg(); arg == nil && k == "" {
+		if k, arg := where.GetArg(); arg != nil || k != "" {
 			whereArgs[k] = arg
 		}
 	}
