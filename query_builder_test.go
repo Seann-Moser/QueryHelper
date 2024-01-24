@@ -27,6 +27,8 @@ func TestQuery_Build(t *testing.T) {
 	}
 	q.Build()
 	println(q.Query)
-
+	args := q.Args(nil)
 	table.Insert(context.Background(), nil, Resource{}, Resource{})
+
+	println(args)
 }
