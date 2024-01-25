@@ -194,7 +194,7 @@ func (q *Query[T]) MapColumns(column ...*Column) *Query[T] {
 	q.MapKeyColumns = append(q.MapKeyColumns, column...)
 	return q
 }
-func (q *Query[T]) UniqueWhere(column *Column, conditional, joinOperator string, level int, value interface{}) *Query[T] {
+func (q *Query[T]) UniqueWhere(column *Column, conditional, joinOperator string, level int, value interface{}, flip bool) *Query[T] {
 	if level < 0 {
 		level = 0
 	}
@@ -207,6 +207,7 @@ func (q *Query[T]) UniqueWhere(column *Column, conditional, joinOperator string,
 		RightValue:   value,
 		Level:        level,
 		JoinOperator: joinOperator,
+		Flip:         true,
 	}
 	if _, found := q.WhereColumns[column.FullTableName()]; !found {
 		q.WhereColumns[column.FullTableName()] = 0
