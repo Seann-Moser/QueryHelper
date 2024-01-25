@@ -23,7 +23,7 @@ func TestQuery_Build(t *testing.T) {
 	}
 	q := QueryTable[Resource](table)
 	for _, permissions := range []string{"test_id", "test_id2"} {
-		q.UniqueWhere(q.Column("id"), "REGEXP", "OR", 1, permissions)
+		q.UniqueWhere(q.Column("id"), "REGEXP", "OR", 1, permissions, true)
 	}
 	q.Build()
 	println(q.Query)

@@ -12,6 +12,7 @@ type WhereStmt struct {
 	Level        int
 	JoinOperator string
 	Index        int
+	Flip         bool
 }
 
 func (w *WhereStmt) GetArg() (string, interface{}) {
@@ -40,6 +41,7 @@ func (w *WhereStmt) ToString() string {
 	if w.Index > 0 {
 		suffix = fmt.Sprintf("_%d", w.Index)
 	}
+
 	var formatted string
 	switch strings.TrimSpace(strings.ToLower(tmp)) {
 	case "is not":
@@ -55,7 +57,12 @@ func (w *WhereStmt) ToString() string {
 	case "in":
 		formatted = fmt.Sprintf("%s %s (:%s%s)", column.FullName(false), tmp, column.Name, suffix)
 	default:
-		formatted = fmt.Sprintf("%s %s :%s%s", column.FullName(false), tmp, column.Name, suffix)
+		if w.Flip {
+			formatted = fmt.Sprintf(":%s%s %s %s", column.Name, suffix, tmp, column.FullName(false))
+		} else {
+			formatted = fmt.Sprintf("%s %s :%s%s", column.FullName(false), tmp, column.Name, suffix)
+		}
+
 	}
 	if strings.Contains(formatted, ".") {
 		return formatted
