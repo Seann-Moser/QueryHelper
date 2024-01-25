@@ -339,7 +339,7 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 		q.Build()
 	}
 	ctx = CtxWithQueryTag(ctx, q.getName())
-	cacheKey := q.GetCacheKey(args)
+	cacheKey := q.GetCacheKey(q.Args(args...))
 	syncMutex.RLock()
 	if _, found := TableCache[q.FromTable.FullTableName()]; !found {
 		TableCache[q.FromTable.FullTableName()] = map[string]string{}
