@@ -54,6 +54,9 @@ func safeString(d interface{}) string {
 	case bool:
 		return strconv.FormatBool(v)
 	}
+	if data, err := json.Marshal(d); err == nil {
+		return string(data)
+	}
 	return ""
 }
 
