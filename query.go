@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/Seann-Moser/ctx_cache"
 	"reflect"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -339,7 +338,7 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 		q.Build()
 	}
 	ctx = CtxWithQueryTag(ctx, q.getName())
-	cacheKey := q.GetCacheKey(q.Args(args...))
+	cacheKey := q.GetCacheKey(args...)
 	syncMutex.RLock()
 	if _, found := TableCache[q.FromTable.FullTableName()]; !found {
 		TableCache[q.FromTable.FullTableName()] = map[string]string{}
@@ -380,32 +379,29 @@ func (q *Query[T]) Args(args ...interface{}) map[string]interface{} {
 }
 
 func (q *Query[T]) GetCacheKey(args ...interface{}) string {
-	var key []string
-	key = append(key, q.FromTable.FullTableName())
+	var keys []string
+	argsData := q.Args(args...)
+
+	keys = append(keys, q.FromTable.FullTableName())
+
 	for _, k := range q.SelectColumns {
-		key = append(key, k.Name)
+		keys = append(keys, k.Name)
 	}
 	for _, k := range q.WhereStmts {
-		key = append(key, k.ToString())
+		keys = append(keys, k.ToString())
 	}
 	for _, k := range q.GroupByStmt {
-		key = append(key, k.Name)
+		keys = append(keys, k.FullTableName())
 	}
 	for _, k := range q.OrderByStmt {
-		key = append(key, k.Name)
+		keys = append(keys, k.FullTableName())
 	}
-	argsData := q.Args(args)
 
 	for k := range argsData {
-		key = append(key, k)
-	}
-	sort.Strings(key)
-
-	for _, k := range key {
-		key = append(key, safeString(argsData[k]))
+		keys = append(keys, fmt.Sprintf("%s:%s", k, safeString(k)))
 	}
 
-	return GetMD5Hash(strings.Join(key, ""))
+	return GetMD5Hash(strings.Join(keys, ""))
 }
 func GetMD5Hash(text string) string {
 	hash := md5.Sum([]byte(text))
