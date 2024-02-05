@@ -436,7 +436,7 @@ func (t *Table[T]) DeleteWithColumns(ctx context.Context, fullTableName string, 
 	if c := t.GetCommonColumns(columns); len(c) == 0 {
 		return nil
 	}
-	tableUpdateSignal <- t.FullTableName()
+	//tableUpdateSignal <- t.FullTableName()
 	return t.db.ExecContext(ctx, DeleteStatement(fullTableName, columns), s)
 }
 
@@ -591,7 +591,7 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 				return "", err
 			}
 		}
-		tableUpdateSignal <- t.FullTableName()
+		//tableUpdateSignal <- t.FullTableName()
 		err := db.ExecContext(ctx, t.InsertStatement(len(s)), args)
 		return generateIds[t.GetGenerateID()[0].Name], err
 	}
@@ -600,7 +600,7 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	tableUpdateSignal <- t.FullTableName()
+	//tableUpdateSignal <- t.FullTableName()
 	err = db.ExecContext(ctx, t.InsertStatement(len(s)), args)
 	return "", err
 }
@@ -629,7 +629,7 @@ func (t *Table[T]) Delete(ctx context.Context, db DB, s T) error {
 	if db == nil {
 		return nil
 	}
-	tableUpdateSignal <- t.FullTableName()
+	//tableUpdateSignal <- t.FullTableName()
 	return db.ExecContext(ctx, t.DeleteStatement(), s)
 }
 
@@ -637,7 +637,7 @@ func (t *Table[T]) DeleteTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, 
 	if db == nil {
 		return nil, nil
 	}
-	tableUpdateSignal <- t.FullTableName()
+	//tableUpdateSignal <- t.FullTableName()
 	return db.NamedExecContext(ctx, t.DeleteStatement(), s)
 }
 
@@ -648,7 +648,7 @@ func (t *Table[T]) Update(ctx context.Context, db DB, s T) error {
 	if db == nil {
 		return nil
 	}
-	tableUpdateSignal <- t.FullTableName()
+	//tableUpdateSignal <- t.FullTableName()
 	return db.ExecContext(ctx, t.UpdateStatement(), s)
 }
 
@@ -656,7 +656,7 @@ func (t *Table[T]) UpdateTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, 
 	if db == nil {
 		return nil, nil
 	}
-	tableUpdateSignal <- t.FullTableName()
+	//tableUpdateSignal <- t.FullTableName()
 	return db.NamedExecContext(ctx, t.UpdateStatement(), s)
 }
 
