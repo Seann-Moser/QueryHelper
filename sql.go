@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	"os"
 	"sort"
 	"strings"
 )
@@ -77,11 +78,22 @@ func (s *SqlDB) CreateTable(ctx context.Context, dataset, table string, columns 
 }
 
 func (s *SqlDB) QueryContext(ctx context.Context, query string, args interface{}) (DBRow, error) {
+	defer func() { //catch or finally
+		if err := recover(); err != nil { //catch
+			fmt.Fprintf(os.Stderr, "Exception: %v\n", err)
+			os.Exit(1)
+		}
+	}()
 	return s.sql.NamedQueryContext(ctx, query, args)
 }
 
 func (s *SqlDB) ExecContext(ctx context.Context, query string, args interface{}) error {
-
+	defer func() { //catch or finally
+		if err := recover(); err != nil { //catch
+			fmt.Fprintf(os.Stderr, "Exception: %v\n", err)
+			os.Exit(1)
+		}
+	}()
 	_, err := s.sql.NamedExecContext(ctx, query, args)
 	return err
 }

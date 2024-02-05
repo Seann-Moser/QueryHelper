@@ -397,8 +397,8 @@ func (q *Query[T]) GetCacheKey(args ...interface{}) string {
 		keys = append(keys, k.FullTableName())
 	}
 
-	for k := range argsData {
-		keys = append(keys, fmt.Sprintf("%s:%s", k, safeString(k)))
+	for k, v := range argsData {
+		keys = append(keys, fmt.Sprintf("%s:%s", k, safeString(v)))
 	}
 
 	return GetMD5Hash(strings.Join(keys, ""))
