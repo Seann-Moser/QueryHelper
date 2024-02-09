@@ -86,7 +86,7 @@ func (c *Column) FullName(groupBy bool, inSelect bool) string {
 		if strings.Contains(c.GroupByModifier, "*") {
 			name = strings.ReplaceAll(c.GroupByModifier, "*", name)
 		} else {
-			name = fmt.Sprintf("%s(%s.%s)", c.GroupByModifier, c.Table, c.Name)
+			name = fmt.Sprintf("%s(%s)", c.GroupByModifier, name)
 		}
 		if c.SelectAs == "" && inSelect {
 			if c.GroupByName != "" {
