@@ -38,6 +38,18 @@ type Column struct {
 	JoinName      string `json:"join_name"`
 
 	AutoGenerateIDType string `json:"auto_generate_id_type"`
+	Wrapper            string `json:"wrapper"`
+	SelectAs           string `json:"as"`
+}
+
+func (c *Column) Wrap(wrap string) *Column {
+	c.Wrapper = wrap
+	return c
+}
+
+func (c *Column) As(as string) *Column {
+	c.SelectAs = as
+	return c
 }
 
 func (c *Column) GetDefinition() string {
@@ -65,15 +77,22 @@ func (c *Column) HasFK() bool {
 }
 
 func (c *Column) FullName(groupBy bool) string {
-	if groupBy && len(c.GroupByModifier) > 0 {
-		suffix := ""
-		if strings.Contains(c.GroupByModifier, "*") {
-			return strings.ReplaceAll(c.GroupByModifier, "*", fmt.Sprintf("%s.%s", c.Table, c.Name)) + suffix
-		}
-		return fmt.Sprintf("%s(%s.%s)%s", c.GroupByModifier, c.Table, c.Name, suffix)
+	name := fmt.Sprintf("%s.%s", c.Table, c.Name)
+	if c.Wrapper != "" {
+		name = fmt.Sprintf(c.Wrapper, name)
 	}
 
-	return fmt.Sprintf("%s.%s", c.Table, c.Name)
+	if groupBy && len(c.GroupByModifier) > 0 {
+		if strings.Contains(c.GroupByModifier, "*") {
+			name = strings.ReplaceAll(c.GroupByModifier, "*", name)
+		} else {
+			name = fmt.Sprintf("%s(%s.%s)", c.GroupByModifier, c.Table, c.Name)
+		}
+	}
+	if c.SelectAs != "" {
+		name = fmt.Sprintf("%s AS %s", name, c.SelectAs)
+	}
+	return name
 }
 
 func (c *Column) FullTableName() string {
@@ -110,6 +129,9 @@ func (c *Column) GetOrderStmt(groupBy bool) string {
 	name := c.Name
 	if c.GroupByName != "" && groupBy {
 		name = c.GroupByName
+	}
+	if c.SelectAs != "" {
+		name = c.SelectAs
 	}
 	if c.OrderAsc {
 		return fmt.Sprintf("%s ASC", name)

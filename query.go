@@ -9,6 +9,7 @@ import (
 	"github.com/Seann-Moser/ctx_cache"
 	"reflect"
 	"strings"
+	"time"
 )
 
 //type CacheMonitor struct {
@@ -65,23 +66,24 @@ import (
 //}
 
 type Query[T any] struct {
-	Name          string
-	err           error
-	SelectColumns []*Column
-	FromTable     *Table[T]
-	FromQuery     *Query[T]
-	JoinStmt      []*JoinStmt
-	WhereStmts    []*WhereStmt
-	GroupByStmt   []*Column
-	OrderByStmt   []*Column
-	MapKeyColumns []*Column
-	LimitCount    int
+	Name                  string
+	err                   error
+	SelectColumns         []*Column
+	DistinctSelectColumns []*Column
+	FromTable             *Table[T]
+	FromQuery             *Query[T]
+	JoinStmt              []*JoinStmt
+	WhereStmts            []*WhereStmt
+	GroupByStmt           []*Column
+	OrderByStmt           []*Column
+	MapKeyColumns         []*Column
+	LimitCount            int
 
-	Cache     ctx_cache.Cache
-	Query     string
-	skipCache bool
-
-	WhereColumns map[string]int
+	Cache         ctx_cache.Cache
+	Query         string
+	skipCache     bool
+	CacheDuration time.Duration
+	WhereColumns  map[string]int
 }
 
 type JoinStmt struct {
@@ -118,21 +120,22 @@ func generateGroupBy(groupBy []*Column) string {
 
 func QueryTable[T any](table *Table[T]) *Query[T] {
 	return &Query[T]{
-		Name:          "",
-		err:           nil,
-		SelectColumns: []*Column{},
-		FromTable:     table,
-		FromQuery:     nil,
-		JoinStmt:      make([]*JoinStmt, 0),
-		WhereStmts:    make([]*WhereStmt, 0),
-		GroupByStmt:   make([]*Column, 0),
-		OrderByStmt:   make([]*Column, 0),
-		MapKeyColumns: make([]*Column, 0),
-		WhereColumns:  map[string]int{},
-		LimitCount:    0,
-		Cache:         nil,
-		Query:         "",
-		skipCache:     false,
+		Name:                  "",
+		err:                   nil,
+		SelectColumns:         []*Column{},
+		DistinctSelectColumns: []*Column{},
+		FromTable:             table,
+		FromQuery:             nil,
+		JoinStmt:              make([]*JoinStmt, 0),
+		WhereStmts:            make([]*WhereStmt, 0),
+		GroupByStmt:           make([]*Column, 0),
+		OrderByStmt:           make([]*Column, 0),
+		MapKeyColumns:         make([]*Column, 0),
+		WhereColumns:          map[string]int{},
+		LimitCount:            0,
+		Cache:                 nil,
+		Query:                 "",
+		skipCache:             false,
 	}
 }
 
@@ -250,6 +253,11 @@ func (q *Query[T]) OrderBy(column ...*Column) *Query[T] {
 		}
 		q.OrderByStmt = append(q.OrderByStmt, c)
 	}
+	return q
+}
+
+func (q *Query[T]) SetCacheDuration(duration time.Duration) *Query[T] {
+	q.CacheDuration = duration
 	return q
 }
 

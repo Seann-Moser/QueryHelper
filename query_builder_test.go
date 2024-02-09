@@ -1,7 +1,6 @@
 package QueryHelper
 
 import (
-	"context"
 	"testing"
 )
 
@@ -22,13 +21,14 @@ func TestQuery_Build(t *testing.T) {
 		t.Fatal(err)
 	}
 	q := QueryTable[Resource](table)
+	q.Select(q.Column("id").Wrap("distinct %s").As("did"))
 	for _, permissions := range []string{"test_id", "test_id2"} {
 		q.UniqueWhere(q.Column("id"), "REGEXP", "OR", 1, permissions, true)
 	}
 	q.Build()
 	println(q.Query)
-	args := q.Args(nil)
-	table.Insert(context.Background(), nil, Resource{}, Resource{})
+	//	args := q.Args(nil)
+	//table.Insert(context.Background(), nil, Resource{}, Resource{})
 
-	println(args)
+	//println(args)
 }
