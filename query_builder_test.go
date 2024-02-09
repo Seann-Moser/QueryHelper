@@ -5,7 +5,7 @@ import (
 )
 
 type Resource struct {
-	ID           string `json:"id" db:"id" qc:"primary;join;join_name::resource_id;"` // ID ("resource.*")
+	ID           string `json:"id" db:"id" qc:"primary;join;join_name::resource_id;group_by_modifier::count(*)"` // ID ("resource.*")
 	Description  string `json:"description" db:"description" qc:"data_type::varchar(512);update"`
 	ResourceType string `json:"resource_type" db:"resource_type" qc:"update"` // ResourceType "url"
 	Data         string `json:"data" db:"data" qc:"update;text"`
@@ -21,10 +21,12 @@ func TestQuery_Build(t *testing.T) {
 		t.Fatal(err)
 	}
 	q := QueryTable[Resource](table)
-	q.Select(q.Column("id").Wrap("distinct %s").As("did"))
+	q.Select(q.Column("id").Wrap("distinct %s").As("did"), q.Column("data"))
 	for _, permissions := range []string{"test_id", "test_id2"} {
 		q.UniqueWhere(q.Column("id"), "REGEXP", "OR", 1, permissions, true)
 	}
+	q.Where(q.Column("id"), "=", "and", 0, nil)
+	q.GroupBy(q.Column("data"))
 	q.Build()
 	println(q.Query)
 	//	args := q.Args(nil)

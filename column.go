@@ -76,9 +76,9 @@ func (c *Column) HasFK() bool {
 	return len(c.ForeignKey) > 0 && len(c.ForeignTable) > 0
 }
 
-func (c *Column) FullName(groupBy bool) string {
+func (c *Column) FullName(groupBy bool, inSelect bool) string {
 	name := fmt.Sprintf("%s.%s", c.Table, c.Name)
-	if c.Wrapper != "" {
+	if c.Wrapper != "" && inSelect {
 		name = fmt.Sprintf(c.Wrapper, name)
 	}
 
@@ -88,8 +88,15 @@ func (c *Column) FullName(groupBy bool) string {
 		} else {
 			name = fmt.Sprintf("%s(%s.%s)", c.GroupByModifier, c.Table, c.Name)
 		}
+		if c.SelectAs == "" && inSelect {
+			if c.GroupByName != "" {
+				name = fmt.Sprintf("%s AS %s", name, c.GroupByName)
+			} else {
+				name = fmt.Sprintf("%s AS %s", name, c.Name)
+			}
+		}
 	}
-	if c.SelectAs != "" {
+	if c.SelectAs != "" && inSelect {
 		name = fmt.Sprintf("%s AS %s", name, c.SelectAs)
 	}
 	return name
