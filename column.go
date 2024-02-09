@@ -88,6 +88,13 @@ func (c *Column) FullName(groupBy bool) string {
 		} else {
 			name = fmt.Sprintf("%s(%s.%s)", c.GroupByModifier, c.Table, c.Name)
 		}
+		if c.SelectAs == "" {
+			if c.GroupByName != "" {
+				name = fmt.Sprintf("%s AS %s", name, c.GroupByName)
+			} else {
+				name = fmt.Sprintf("%s AS %s", name, c.Name)
+			}
+		}
 	}
 	if c.SelectAs != "" {
 		name = fmt.Sprintf("%s AS %s", name, c.SelectAs)

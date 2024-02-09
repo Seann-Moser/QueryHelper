@@ -106,12 +106,14 @@ func generateGroupBy(groupBy []*Column) string {
 		if c == nil {
 			return ""
 		}
-		if c.GroupByName != "" {
-			columns = append(columns, c.GroupByName)
-		} else if c.ForceGroupByValue {
-			columns = append(columns, c.FullName(true))
+		if c.SelectAs == "" {
+			if c.GroupByName != "" {
+				columns = append(columns, c.GroupByName)
+			} else {
+				columns = append(columns, c.Name)
+			}
 		} else {
-			columns = append(columns, c.FullName(false))
+			columns = append(columns, c.SelectAs)
 		}
 
 	}
@@ -241,7 +243,17 @@ func (q *Query[T]) GroupBy(column ...*Column) *Query[T] {
 		if c == nil {
 			continue
 		}
-		q.GroupByStmt = append(q.GroupByStmt, c)
+		if len(q.SelectColumns) > 0 {
+			for _, selectColumn := range q.SelectColumns {
+				if strings.EqualFold(c.Name, selectColumn.Name) {
+					q.GroupByStmt = append(q.GroupByStmt, selectColumn)
+					break
+				}
+			}
+		} else {
+			q.GroupByStmt = append(q.GroupByStmt, c)
+		}
+
 	}
 	return q
 }
@@ -418,7 +430,7 @@ func (q *Query[T]) buildSqlQuery() *Query[T] {
 	}
 	var isGroupBy = len(q.GroupByStmt) > 0
 	var query string
-	selectColumns := q.FromTable.GetSelectableColumns(isGroupBy, isGroupBy, q.SelectColumns...)
+	selectColumns := q.FromTable.GetSelectableColumns(isGroupBy, q.SelectColumns...)
 
 	if q.FromQuery != nil {
 		q.FromQuery.Build()
