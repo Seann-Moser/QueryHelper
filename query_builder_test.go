@@ -25,6 +25,7 @@ func TestQuery_Build(t *testing.T) {
 	for _, permissions := range []string{"test_id", "test_id2"} {
 		q.UniqueWhere(q.Column("id"), "REGEXP", "OR", 1, permissions, true)
 	}
+	q.Where(q.Column("id"), "=", "and", 0, nil)
 	q.GroupBy(q.Column("data"))
 	q.Build()
 	println(q.Query)

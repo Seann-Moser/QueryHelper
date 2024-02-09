@@ -46,25 +46,25 @@ func (w *WhereStmt) ToString() string {
 	switch strings.TrimSpace(strings.ToLower(tmp)) {
 	case "is not":
 		if w.RightValue == nil {
-			formatted = fmt.Sprintf("%s %s null", column.FullName(false), tmp)
+			formatted = fmt.Sprintf("%s %s null", column.FullName(false, false), tmp)
 		}
 	case "is":
 		if w.RightValue == nil {
-			formatted = fmt.Sprintf("%s %s null", column.FullName(false), tmp)
+			formatted = fmt.Sprintf("%s %s null", column.FullName(false, false), tmp)
 		}
 	case "not in":
 		fallthrough
 	case "in":
-		formatted = fmt.Sprintf("%s %s (:%s%s)", column.FullName(false), tmp, column.Name, suffix)
+		formatted = fmt.Sprintf("%s %s (:%s%s)", column.FullName(false, false), tmp, column.Name, suffix)
 	default:
 		if w.Flip {
-			formatted = fmt.Sprintf(":%s%s %s %s", column.Name, suffix, tmp, column.FullName(false))
+			formatted = fmt.Sprintf(":%s%s %s %s", column.Name, suffix, tmp, column.FullName(false, false))
 		} else {
-			formatted = fmt.Sprintf("%s %s :%s%s", column.FullName(false), tmp, column.Name, suffix)
+			formatted = fmt.Sprintf("%s %s :%s%s", column.FullName(false, false), tmp, column.Name, suffix)
 		}
 
 	}
-	if strings.Contains(formatted, ".") {
+	if strings.Contains(formatted, ":") {
 		return formatted
 	}
 	return ""

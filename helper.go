@@ -227,9 +227,9 @@ func WhereValues(whereElements map[string]*Column, useJoin bool) []string {
 		case "not in":
 			fallthrough
 		case "in":
-			formatted = fmt.Sprintf("%s %s (:%s)", column.FullName(false), tmp, column.Name)
+			formatted = fmt.Sprintf("%s %s (:%s)", column.FullName(false, false), tmp, column.Name)
 		default:
-			formatted = fmt.Sprintf("%s %s :%s", column.FullName(false), tmp, column.Name)
+			formatted = fmt.Sprintf("%s %s :%s", column.FullName(false, false), tmp, column.Name)
 		}
 		if strings.Contains(formatted, ".") {
 			whereValues = append(whereValues, formatted)

@@ -152,9 +152,9 @@ func (t *Table[T]) WhereValues(whereElementsStr ...string) []string {
 		case "not in":
 			fallthrough
 		case "in":
-			formatted = fmt.Sprintf("%s %s (:%s)", column.FullName(false), tmp, column.Name)
+			formatted = fmt.Sprintf("%s %s (:%s)", column.FullName(false, false), tmp, column.Name)
 		default:
-			formatted = fmt.Sprintf("%s %s :%s", column.FullName(false), tmp, column.Name)
+			formatted = fmt.Sprintf("%s %s :%s", column.FullName(false, false), tmp, column.Name)
 		}
 		if strings.Contains(formatted, ".") {
 			whereValues = append(whereValues, formatted)
@@ -222,7 +222,7 @@ func (t *Table[T]) GetSelectableColumns(groupBy bool, names ...*Column) []string
 			}
 
 			if e.Select {
-				selectValues = append(selectValues, e.FullName(groupBy))
+				selectValues = append(selectValues, e.FullName(groupBy, true))
 			}
 		}
 		return selectValues
@@ -230,7 +230,7 @@ func (t *Table[T]) GetSelectableColumns(groupBy bool, names ...*Column) []string
 
 	for _, e := range t.Columns {
 		if e.Select {
-			selectValues = append(selectValues, e.FullName(groupBy))
+			selectValues = append(selectValues, e.FullName(groupBy, true))
 		}
 	}
 	return selectValues
