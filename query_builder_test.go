@@ -1,7 +1,6 @@
 package QueryHelper
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -56,20 +55,26 @@ func TestQuery_BuildGroupBy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	q := QueryTable[Answer](answerTable)
-	q.Select(q.Column("uid").Wrap("distinct %s").As("id"), q.Column("survey_id")).
-		Where(q.Column("survey_id"), "in", "AND", 0, strings.Join([]string{}, ",")).
-		///		SetCache(ctx_cache.GetCacheFromContext(ctx)).
-		GroupBy(q.Column("survey_id")).
-		Build()
+	//q := QueryTable[Answer](answerTable)
+	//q.Select(q.Column("uid").Wrap("distinct %s").As("id"), q.Column("survey_id")).
+	//	Where(q.Column("survey_id"), "in", "AND", 0, strings.Join([]string{}, ",")).
+	//	///		SetCache(ctx_cache.GetCacheFromContext(ctx)).
+	//	GroupBy(q.Column("survey_id")).
+	//	Build()
+	//
+	//qs := QueryTable[Answer](answerTable).
+	//	Where(answerTable.GetColumn("uid"), "=", "AND", 1, "uid").
+	//	Where(answerTable.GetColumn("question_id"), "=", "AND", 1, "q_id").
+	//	Where(answerTable.GetColumn("survey_id"), "=", "AND", 1, "s_id").
+	//	Build()
+	//
+	//println(qs.Query)
 
-	qs := QueryTable[Answer](answerTable).
-		Where(answerTable.GetColumn("uid"), "=", "AND", 1, "uid").
-		Where(answerTable.GetColumn("question_id"), "=", "AND", 1, "q_id").
-		Where(answerTable.GetColumn("survey_id"), "=", "AND", 1, "s_id").
+	qt := QueryTable[Answer](answerTable)
+	qt.Select(qt.Column("uid").Wrap("count(distinct %s)").As("id")).
+		Where(qt.Column("survey_id"), "=", "AND", 0, "test_id").
 		Build()
-
-	println(qs.Query)
+	println(qt.Query)
 	//	args := q.Args(nil)
 	//table.Insert(context.Background(), nil, Resource{}, Resource{})
 

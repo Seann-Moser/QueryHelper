@@ -222,7 +222,7 @@ func (t *Table[T]) GetSelectableColumns(groupBy bool, names ...Column) []string 
 			}
 
 			if e.Select {
-				selectValues = append(selectValues, e.FullName(groupBy, true))
+				selectValues = append(selectValues, name.FullName(groupBy, true))
 			}
 		}
 		return selectValues
