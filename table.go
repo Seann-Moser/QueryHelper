@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -111,7 +112,10 @@ func (t *Table[T]) GetPrimary() []*Column {
 
 func (t *Table[T]) GetColumn(name string) *Column {
 	if column, found := t.Columns[ToSnakeCase(name)]; found {
-		return column
+		d, _ := json.Marshal(column)
+		c := Column{}
+		_ = json.Unmarshal(d, &c)
+		return &c
 	}
 	return nil
 }
