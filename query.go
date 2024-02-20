@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"github.com/Seann-Moser/ctx_cache"
 	"reflect"
@@ -169,7 +170,10 @@ func (q *Query[T]) Column(name string) *Column {
 	if c == nil {
 		q.err = fmt.Errorf("missing column from table(%s) %s", q.FromTable.FullTableName(), name)
 	}
-	return c
+	d, _ := json.Marshal(c)
+	column := Column{}
+	_ = json.Unmarshal(d, &column)
+	return &column
 }
 
 func (q *Query[T]) Join(tableColumns map[string]*Column, joinType string) *Query[T] {
@@ -424,6 +428,7 @@ func GetMD5Hash(text string) string {
 	hash := md5.Sum([]byte(text))
 	return hex.EncodeToString(hash[:])
 }
+
 func (q *Query[T]) buildSqlQuery() *Query[T] {
 	if q.err != nil {
 		return q
