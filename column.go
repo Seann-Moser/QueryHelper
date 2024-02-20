@@ -42,12 +42,12 @@ type Column struct {
 	SelectAs           string `json:"as"`
 }
 
-func (c *Column) Wrap(wrap string) *Column {
+func (c Column) Wrap(wrap string) Column {
 	c.Wrapper = wrap
 	return c
 }
 
-func (c *Column) As(as string) *Column {
+func (c Column) As(as string) Column {
 	c.SelectAs = as
 	return c
 }

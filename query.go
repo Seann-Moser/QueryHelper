@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"github.com/Seann-Moser/ctx_cache"
 	"reflect"
@@ -69,15 +68,15 @@ import (
 type Query[T any] struct {
 	Name                  string
 	err                   error
-	SelectColumns         []*Column
-	DistinctSelectColumns []*Column
+	SelectColumns         []Column
+	DistinctSelectColumns []Column
 	FromTable             *Table[T]
 	FromQuery             *Query[T]
 	JoinStmt              []*JoinStmt
 	WhereStmts            []*WhereStmt
-	GroupByStmt           []*Column
-	OrderByStmt           []*Column
-	MapKeyColumns         []*Column
+	GroupByStmt           []Column
+	OrderByStmt           []Column
+	MapKeyColumns         []Column
 	LimitCount            int
 
 	Cache         ctx_cache.Cache
@@ -88,7 +87,7 @@ type Query[T any] struct {
 }
 
 type JoinStmt struct {
-	Columns  map[string]*Column
+	Columns  map[string]Column
 	JoinType string
 }
 
@@ -101,10 +100,10 @@ func GetQuery[T any](ctx context.Context) *Query[T] {
 	return q
 }
 
-func generateGroupBy(groupBy []*Column) string {
+func generateGroupBy(groupBy []Column) string {
 	var columns []string
 	for _, c := range groupBy {
-		if c == nil {
+		if c.Name == "" {
 			return ""
 		}
 		if c.SelectAs == "" {
@@ -125,15 +124,15 @@ func QueryTable[T any](table *Table[T]) *Query[T] {
 	return &Query[T]{
 		Name:                  "",
 		err:                   nil,
-		SelectColumns:         []*Column{},
-		DistinctSelectColumns: []*Column{},
+		SelectColumns:         []Column{},
+		DistinctSelectColumns: []Column{},
 		FromTable:             table,
 		FromQuery:             nil,
 		JoinStmt:              make([]*JoinStmt, 0),
 		WhereStmts:            make([]*WhereStmt, 0),
-		GroupByStmt:           make([]*Column, 0),
-		OrderByStmt:           make([]*Column, 0),
-		MapKeyColumns:         make([]*Column, 0),
+		GroupByStmt:           make([]Column, 0),
+		OrderByStmt:           make([]Column, 0),
+		MapKeyColumns:         make([]Column, 0),
 		WhereColumns:          map[string]int{},
 		LimitCount:            0,
 		Cache:                 nil,
@@ -142,9 +141,9 @@ func QueryTable[T any](table *Table[T]) *Query[T] {
 	}
 }
 
-func (q *Query[T]) Select(columns ...*Column) *Query[T] {
+func (q *Query[T]) Select(columns ...Column) *Query[T] {
 	for _, c := range columns {
-		if c == nil {
+		if c.Name == "" {
 			continue
 		}
 		q.SelectColumns = append(q.SelectColumns, c)
@@ -162,21 +161,18 @@ func (q *Query[T]) From(query *Query[T]) *Query[T] {
 	return q
 }
 
-func (q *Query[T]) Column(name string) *Column {
+func (q *Query[T]) Column(name string) Column {
 	if q.err != nil {
-		return nil
+		return Column{}
 	}
 	c := q.FromTable.GetColumn(name)
-	if c == nil {
+	if c.Name == "" {
 		q.err = fmt.Errorf("missing column from table(%s) %s", q.FromTable.FullTableName(), name)
 	}
-	d, _ := json.Marshal(c)
-	column := Column{}
-	_ = json.Unmarshal(d, &column)
-	return &column
+	return c
 }
 
-func (q *Query[T]) Join(tableColumns map[string]*Column, joinType string) *Query[T] {
+func (q *Query[T]) Join(tableColumns map[string]Column, joinType string) *Query[T] {
 	q.JoinStmt = append(q.JoinStmt, &JoinStmt{
 		Columns:  tableColumns,
 		JoinType: joinType,
@@ -184,26 +180,26 @@ func (q *Query[T]) Join(tableColumns map[string]*Column, joinType string) *Query
 	return q
 }
 
-func (q *Query[T]) JoinColumn(joinType string, tableColumns *Column) *Query[T] {
+func (q *Query[T]) JoinColumn(joinType string, tableColumns Column) *Query[T] {
 	q.JoinStmt = append(q.JoinStmt, &JoinStmt{
-		Columns:  map[string]*Column{tableColumns.Name: tableColumns},
+		Columns:  map[string]Column{tableColumns.Name: tableColumns},
 		JoinType: joinType,
 	})
 	return q
 }
 
-func (q *Query[T]) MapColumns(column ...*Column) *Query[T] {
+func (q *Query[T]) MapColumns(column ...Column) *Query[T] {
 	if column == nil {
 		return q
 	}
 	q.MapKeyColumns = append(q.MapKeyColumns, column...)
 	return q
 }
-func (q *Query[T]) UniqueWhere(column *Column, conditional, joinOperator string, level int, value interface{}, flip bool) *Query[T] {
+func (q *Query[T]) UniqueWhere(column Column, conditional, joinOperator string, level int, value interface{}, flip bool) *Query[T] {
 	if level < 0 {
 		level = 0
 	}
-	if column == nil {
+	if column.Name == "" {
 		return q
 	}
 	stmt := &WhereStmt{
@@ -224,11 +220,11 @@ func (q *Query[T]) UniqueWhere(column *Column, conditional, joinOperator string,
 	return q
 }
 
-func (q *Query[T]) Where(column *Column, conditional, joinOperator string, level int, value interface{}) *Query[T] {
+func (q *Query[T]) Where(column Column, conditional, joinOperator string, level int, value interface{}) *Query[T] {
 	if level < 0 {
 		level = 0
 	}
-	if column == nil {
+	if column.Name == "" {
 		return q
 	}
 	q.WhereStmts = append(q.WhereStmts, &WhereStmt{
@@ -242,9 +238,9 @@ func (q *Query[T]) Where(column *Column, conditional, joinOperator string, level
 	return q
 }
 
-func (q *Query[T]) GroupBy(column ...*Column) *Query[T] {
+func (q *Query[T]) GroupBy(column ...Column) *Query[T] {
 	for _, c := range column {
-		if c == nil {
+		if c.Name == "" {
 			continue
 		}
 		if len(q.SelectColumns) > 0 {
@@ -262,9 +258,9 @@ func (q *Query[T]) GroupBy(column ...*Column) *Query[T] {
 	return q
 }
 
-func (q *Query[T]) OrderBy(column ...*Column) *Query[T] {
+func (q *Query[T]) OrderBy(column ...Column) *Query[T] {
 	for _, c := range column {
-		if c == nil {
+		if c.Name == "" {
 			continue
 		}
 		q.OrderByStmt = append(q.OrderByStmt, c)
@@ -448,8 +444,8 @@ func (q *Query[T]) buildSqlQuery() *Query[T] {
 
 	if len(q.JoinStmt) > 0 {
 		for _, join := range q.JoinStmt {
-			overlappingColumns := map[string]*Column{}
-			overlappingColumns = JoinMaps[*Column](overlappingColumns, q.FromTable.GetCommonColumns(join.Columns))
+			overlappingColumns := map[string]Column{}
+			overlappingColumns = JoinMaps[Column](overlappingColumns, q.FromTable.GetCommonColumns(join.Columns))
 			if len(overlappingColumns) == 0 {
 				continue
 			}

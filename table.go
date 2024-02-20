@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -38,10 +37,10 @@ var (
 )
 
 type Table[T any] struct {
-	Dataset   string             `json:"dataset"`
-	Name      string             `json:"name"`
-	Columns   map[string]*Column `json:"columns"`
-	QueryType QueryType          `json:"query_type"`
+	Dataset   string            `json:"dataset"`
+	Name      string            `json:"name"`
+	Columns   map[string]Column `json:"columns"`
+	QueryType QueryType         `json:"query_type"`
 	db        DB
 }
 
@@ -51,7 +50,7 @@ func NewTable[T any](databaseName string, queryType QueryType) (*Table[T], error
 	newTable := Table[T]{
 		Dataset:   databaseName,
 		Name:      ToSnakeCase(getType(s)),
-		Columns:   map[string]*Column{},
+		Columns:   map[string]Column{},
 		QueryType: queryType,
 	}
 
@@ -86,7 +85,7 @@ func NewTable[T any](databaseName string, queryType QueryType) (*Table[T], error
 		if column.Name == "-" {
 			continue
 		}
-		newTable.Columns[column.Name] = column
+		newTable.Columns[column.Name] = *column
 	}
 	if !setPrimary {
 		return nil, MissingPrimaryKeyErr
@@ -99,8 +98,8 @@ func ToSnakeCase(str string) string {
 	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
 	return strings.ToLower(snake)
 }
-func (t *Table[T]) GetPrimary() []*Column {
-	var primaryColumns []*Column
+func (t *Table[T]) GetPrimary() []Column {
+	var primaryColumns []Column
 	for _, c := range t.Columns {
 		if c.Primary {
 			primaryColumns = append(primaryColumns, c)
@@ -110,14 +109,11 @@ func (t *Table[T]) GetPrimary() []*Column {
 	return primaryColumns
 }
 
-func (t *Table[T]) GetColumn(name string) *Column {
+func (t *Table[T]) GetColumn(name string) Column {
 	if column, found := t.Columns[ToSnakeCase(name)]; found {
-		d, _ := json.Marshal(column)
-		c := Column{}
-		_ = json.Unmarshal(d, &c)
-		return &c
+		return column
 	}
-	return nil
+	return Column{}
 }
 
 func (t *Table[T]) InitializeTable(ctx context.Context, db DB, suffix ...string) error {
@@ -213,11 +209,11 @@ func (t *Table[T]) NamedSelect(ctx context.Context, db DB, query string, args ..
 	return output, nil
 }
 
-func (t *Table[T]) GetSelectableColumns(groupBy bool, names ...*Column) []string {
+func (t *Table[T]) GetSelectableColumns(groupBy bool, names ...Column) []string {
 	var selectValues []string
 	if len(names) > 0 {
 		for _, name := range names {
-			if name == nil {
+			if name.Name == "" {
 				continue
 			}
 			e, found := t.Columns[name.Name]
@@ -254,7 +250,7 @@ func (t *Table[T]) WhereStatement(conditional string, whereElementsStr ...string
 func (t *Table[T]) OrderByStatement(groupBy bool, orderBy ...string) string {
 	var orderByValues []string
 
-	var columns []*Column
+	var columns []Column
 	for _, o := range orderBy {
 		if v, found := t.Columns[o]; found {
 			columns = append(columns, v)
@@ -282,7 +278,7 @@ func (t *Table[T]) OrderByStatement(groupBy bool, orderBy ...string) string {
 	return fmt.Sprintf("ORDER BY %s", strings.Join(orderByValues, ","))
 }
 
-func (t *Table[T]) OrderByColumns(groupBy bool, columns ...*Column) string {
+func (t *Table[T]) OrderByColumns(groupBy bool, columns ...Column) string {
 	var orderByValues []string
 
 	for _, column := range t.Columns {
@@ -314,8 +310,8 @@ func (t *Table[T]) IsAutoGenerateID() bool {
 	return false
 }
 
-func (t *Table[T]) GetGenerateID() []*Column {
-	var output []*Column
+func (t *Table[T]) GetGenerateID() []Column {
+	var output []Column
 	for _, e := range t.Columns {
 		if e.AutoGenerateID {
 			output = append(output, e)
@@ -403,7 +399,7 @@ func (t *Table[T]) UpdateStatement() string {
 	return update
 }
 
-func DeleteStatement(fullTableName string, columns map[string]*Column) string {
+func DeleteStatement(fullTableName string, columns map[string]Column) string {
 	var whereValues []string
 	for _, e := range columns {
 		if e.Primary {
@@ -417,7 +413,7 @@ func DeleteStatement(fullTableName string, columns map[string]*Column) string {
 	return fmt.Sprintf("DELETE FROM %s WHERE %s", fullTableName, strings.Join(whereValues, " AND "))
 }
 
-func (t *Table[T]) DeleteWithColumns(ctx context.Context, fullTableName string, columns map[string]*Column, s T) error {
+func (t *Table[T]) DeleteWithColumns(ctx context.Context, fullTableName string, columns map[string]Column, s T) error {
 	if t.db == nil {
 		return nil
 	}
@@ -462,7 +458,7 @@ func (t *Table[T]) NamedQuery(ctx context.Context, db DB, query string, args ...
 	return db.QueryContext(ctx, query, a)
 }
 
-func (t *Table[T]) HasColumn(c *Column) (string, bool) {
+func (t *Table[T]) HasColumn(c Column) (string, bool) {
 	if !c.Join && !c.Select && c.WhereJoin == "" {
 		return "", false
 	}
@@ -486,8 +482,8 @@ func (t *Table[T]) HasColumn(c *Column) (string, bool) {
 	return "", false
 }
 
-func (t *Table[T]) GetCommonColumns(columns map[string]*Column) map[string]*Column {
-	overlappingColumns := map[string]*Column{}
+func (t *Table[T]) GetCommonColumns(columns map[string]Column) map[string]Column {
+	overlappingColumns := map[string]Column{}
 	for k, column := range columns {
 		if _, found := t.HasColumn(column); found {
 			overlappingColumns[k] = column
@@ -496,12 +492,12 @@ func (t *Table[T]) GetCommonColumns(columns map[string]*Column) map[string]*Colu
 	return overlappingColumns
 }
 
-func (t *Table[T]) SelectJoinStmt(JoinType string, orderBy []string, groupBy bool, tableColumns ...map[string]*Column) (string, error) {
-	overlappingColumns := map[string]*Column{}
-	allColumns := map[string]*Column{}
+func (t *Table[T]) SelectJoinStmt(JoinType string, orderBy []string, groupBy bool, tableColumns ...map[string]Column) (string, error) {
+	overlappingColumns := map[string]Column{}
+	allColumns := map[string]Column{}
 	for _, columns := range tableColumns {
-		overlappingColumns = JoinMaps[*Column](overlappingColumns, t.GetCommonColumns(columns))
-		allColumns = JoinMaps[*Column](allColumns, columns)
+		overlappingColumns = JoinMaps[Column](overlappingColumns, t.GetCommonColumns(columns))
+		allColumns = JoinMaps[Column](allColumns, columns)
 	}
 	if len(overlappingColumns) == 0 {
 		return "", NoOverlappingColumnsErr
@@ -514,7 +510,7 @@ func (t *Table[T]) SelectJoinStmt(JoinType string, orderBy []string, groupBy boo
 	return selectStmt, nil
 }
 
-func (t *Table[T]) generateJoinStmt(columns map[string]*Column, JoinType string) string {
+func (t *Table[T]) generateJoinStmt(columns map[string]Column, JoinType string) string {
 	if len(columns) == 0 {
 		return ""
 	}
@@ -547,7 +543,7 @@ func (t *Table[T]) generateJoinStmt(columns map[string]*Column, JoinType string)
 	return output
 }
 
-func (t *Table[T]) generateWhereStmt(columns map[string]*Column) string {
+func (t *Table[T]) generateWhereStmt(columns map[string]Column) string {
 	if len(columns) == 0 {
 		return ""
 	}
