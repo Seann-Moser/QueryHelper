@@ -1,6 +1,7 @@
 package QueryHelper
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -26,7 +27,7 @@ func TestQuery_Build(t *testing.T) {
 		q.UniqueWhere(q.Column("id"), "REGEXP", "OR", 1, permissions, true)
 	}
 	q.Where(q.Column("id"), "=", "and", 0, nil)
-	q.GroupBy(q.Column("data"))
+	q.GroupBy(q.Column("data"), q.Column("id"))
 	q.Build()
 	println(q.Query)
 	//	args := q.Args(nil)
@@ -55,13 +56,20 @@ func TestQuery_BuildGroupBy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	q := QueryTable[Answer](answerTable).
+	q := QueryTable[Answer](answerTable)
+	q.Select(q.Column("uid").Wrap("distinct %s").As("id"), q.Column("survey_id")).
+		Where(q.Column("survey_id"), "in", "AND", 0, strings.Join([]string{}, ",")).
+		///		SetCache(ctx_cache.GetCacheFromContext(ctx)).
+		GroupBy(q.Column("survey_id")).
+		Build()
+
+	qs := QueryTable[Answer](answerTable).
 		Where(answerTable.GetColumn("uid"), "=", "AND", 1, "uid").
 		Where(answerTable.GetColumn("question_id"), "=", "AND", 1, "q_id").
 		Where(answerTable.GetColumn("survey_id"), "=", "AND", 1, "s_id").
 		Build()
 
-	println(q.Query)
+	println(qs.Query)
 	//	args := q.Args(nil)
 	//table.Insert(context.Background(), nil, Resource{}, Resource{})
 

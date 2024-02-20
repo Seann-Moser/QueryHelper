@@ -29,14 +29,14 @@ func (s *SqlDB) Close() {
 	_ = s.sql.Close()
 }
 
-func (s *SqlDB) CreateTable(ctx context.Context, dataset, table string, columns map[string]*Column) error {
+func (s *SqlDB) CreateTable(ctx context.Context, dataset, table string, columns map[string]Column) error {
 	createSchemaStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", dataset)
 	var PrimaryKeys []string
 	var FK []string
 	createStatement := ""
 	createStatement += fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s(", dataset, table)
 
-	var c []*Column
+	var c []Column
 
 	for _, column := range columns {
 		c = append(c, column)

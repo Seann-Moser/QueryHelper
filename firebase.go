@@ -24,7 +24,7 @@ func (f FirebaseDB) Ping(ctx context.Context) error {
 	panic("implement me")
 }
 
-func (f FirebaseDB) CreateTable(ctx context.Context, dataset, table string, columns map[string]*Column) error {
+func (f FirebaseDB) CreateTable(ctx context.Context, dataset, table string, columns map[string]Column) error {
 	//TODO implement me
 	panic("implement me")
 }

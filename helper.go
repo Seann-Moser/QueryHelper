@@ -205,7 +205,7 @@ func JoinMaps[T any](m ...map[string]T) map[string]T {
 	return output
 }
 
-func WhereValues(whereElements map[string]*Column, useJoin bool) []string {
+func WhereValues(whereElements map[string]Column, useJoin bool) []string {
 	var whereValues []string
 	dedup := map[string]struct{}{}
 	for _, column := range whereElements {

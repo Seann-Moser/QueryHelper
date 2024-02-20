@@ -6,7 +6,7 @@ import (
 )
 
 type WhereStmt struct {
-	LeftValue    *Column
+	LeftValue    Column
 	Conditional  string
 	RightValue   interface{}
 	Level        int
@@ -28,7 +28,7 @@ func (w *WhereStmt) GetArg() (string, interface{}) {
 
 func (w *WhereStmt) ToString() string {
 	column := w.LeftValue
-	if column == nil {
+	if column.Name == "" {
 		return ""
 	}
 	tmp := column.Where
