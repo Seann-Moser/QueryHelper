@@ -15,6 +15,16 @@ type WhereStmt struct {
 	Flip         bool
 }
 
+func NewWhere(column Column, value interface{}) *WhereStmt {
+	return &WhereStmt{
+		LeftValue:    column,
+		Conditional:  "=",
+		RightValue:   value,
+		Level:        0,
+		JoinOperator: "AND",
+	}
+}
+
 func (w *WhereStmt) GetArg() (string, interface{}) {
 	if w.RightValue == nil {
 		return "", nil
