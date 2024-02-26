@@ -114,3 +114,7 @@ func GetIDCtx[T any](ctx context.Context, id string) (*T, error) {
 	q.Where(q.Column("id"), "=", "AND", 0, id)
 	return q.RunSingle(ctx, nil)
 }
+
+func GetColumn[T any](ctx context.Context, name string) Column {
+	return GetQuery[T](ctx).Column(name)
+}
