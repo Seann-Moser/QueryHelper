@@ -347,6 +347,17 @@ func (q *Query[T]) RunMap(ctx context.Context, db DB, args ...interface{}) (map[
 	return m, err
 }
 
+func (q *Query[T]) RunSingle(ctx context.Context, db DB, args ...interface{}) (*T, error) {
+	rows, err := q.Limit(1).Run(ctx, db, args...)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return rows[0], nil
+}
+
 func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, error) {
 	if q.err != nil {
 		return nil, q.err
