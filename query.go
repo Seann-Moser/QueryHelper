@@ -208,7 +208,7 @@ func (q *Query[T]) UniqueWhere(column Column, conditional, joinOperator string, 
 		RightValue:   value,
 		Level:        level,
 		JoinOperator: joinOperator,
-		Flip:         true,
+		Flip:         flip,
 	}
 	if _, found := q.WhereColumns[column.FullTableName()]; !found {
 		q.WhereColumns[column.FullTableName()] = 0
