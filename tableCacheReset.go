@@ -97,7 +97,7 @@ func (r *TableCacheReset) Start(ctx context.Context) {
 				go func() {
 					cache := ctx_cache.GetCacheFromContext(ctx)
 					for table, cacheKeys := range r.TableCache {
-						for key, _ := range cacheKeys {
+						for key := range cacheKeys {
 							if _, err := cache.GetCache(ctx, key); err == ctx_cache.ErrCacheMiss {
 								r.syncMutex.Lock()
 								delete(r.TableCache[table], key)
@@ -112,7 +112,7 @@ func (r *TableCacheReset) Start(ctx context.Context) {
 				}
 				cache := ctx_cache.GetCacheFromContext(ctx)
 				r.syncMutex.Lock()
-				for key, _ := range r.TableCache[v] {
+				for key := range r.TableCache[v] {
 					_ = cache.DeleteKey(ctx, key)
 				}
 				//todo add to cache so other instances can ref
