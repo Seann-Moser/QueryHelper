@@ -380,6 +380,8 @@ func (t *Table[T]) UpdateStatement() string {
 	for _, e := range t.Columns {
 		if e.Primary && !e.Update {
 			whereValues = append(whereValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
+		} else if e.AutoGenerateID {
+			whereValues = append(whereValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
 		}
 		if !e.Update {
 			continue
