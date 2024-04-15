@@ -9,7 +9,7 @@ import (
 
 const (
 	TableTypeInt     = "int"
-	TableTypeFloat   = "int"
+	TableTypeFloat   = "float64"
 	TableTypeVarChar = "varchar(256)"
 	TableTypeText    = "text"
 	TableTypeBool    = "tinyint(1)"
