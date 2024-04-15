@@ -3,7 +3,7 @@ module github.com/Seann-Moser/QueryHelper
 go 1.21.4
 
 require (
-	github.com/Seann-Moser/ctx_cache v1.0.7
+	github.com/Seann-Moser/ctx_cache v1.0.8
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.3.5
 	go.opencensus.io v0.24.0
