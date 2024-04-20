@@ -4,6 +4,7 @@ go 1.21.4
 
 require (
 	github.com/Seann-Moser/ctx_cache v1.0.8
+	github.com/Seann-Moser/go-serve v0.7.84
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.3.5
 	go.opencensus.io v0.24.0
@@ -28,6 +29,7 @@ require (
 	github.com/spf13/viper v1.18.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/exp v0.0.0-20240409090435-93d18d7e34b8 // indirect
 	golang.org/x/sys v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect

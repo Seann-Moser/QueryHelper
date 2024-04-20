@@ -2,8 +2,13 @@ package QueryHelper
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"github.com/Seann-Moser/go-serve/pkg/ctxLogger"
 	"github.com/jmoiron/sqlx"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	"os"
 	"sort"
 	"strings"
@@ -12,12 +17,19 @@ import (
 var _ DB = &SqlDB{}
 
 type SqlDB struct {
-	sql *sqlx.DB
+	sql           *sqlx.DB
+	updateColumns bool
 }
 
+func Flags() *pflag.FlagSet {
+	fs := pflag.NewFlagSet("sql-db", pflag.ExitOnError)
+	fs.Bool("sql-db-update-columns", false, "")
+	return fs
+}
 func NewSql(db *sqlx.DB) *SqlDB {
 	return &SqlDB{
-		sql: db,
+		sql:           db,
+		updateColumns: viper.GetBool("sql-db-update-columns"),
 	}
 }
 
@@ -74,6 +86,9 @@ func (s *SqlDB) CreateTable(ctx context.Context, dataset, table string, columns 
 			return err
 		}
 	}
+	if s.updateColumns {
+		return s.ColumnUpdater(ctx, dataset, table, columns)
+	}
 	return nil
 }
 
@@ -96,4 +111,102 @@ func (s *SqlDB) ExecContext(ctx context.Context, query string, args interface{})
 	}()
 	_, err := s.sql.NamedExecContext(ctx, query, args)
 	return err
+}
+
+func (s *SqlDB) ColumnUpdater(ctx context.Context, dataset, table string, columns map[string]Column) error {
+	cols, err := getColumns(ctx, s.sql, dataset, table)
+	if err != nil {
+		return err
+	}
+	var addColumns []*Column
+	var removeColumns []*sql.ColumnType
+	colMap := map[string]*sql.ColumnType{}
+	for _, c := range cols {
+		colMap[c.Name()] = c
+	}
+
+	for _, e := range columns {
+		if _, found := colMap[e.Name]; !found {
+			addColumns = append(addColumns, &e)
+		}
+	}
+
+	for _, c := range cols {
+		if _, found := columns[c.Name()]; !found {
+			removeColumns = append(removeColumns, c)
+		}
+	}
+
+	alterTable := fmt.Sprintf("ALTER TABLE %s.%s ", dataset, table)
+
+	if len(addColumns) > 0 {
+		addStmt := generateColumnStatements(alterTable, "add", addColumns)
+		ctxLogger.Debug(ctx, "adding columns to table", zap.String("query", addStmt))
+		_, err := s.sql.ExecContext(ctx, addStmt)
+		if err != nil {
+			return err
+		}
+	}
+	if len(removeColumns) > 0 {
+		removeStmt := generateColumnTypeStatements(alterTable, "remove", removeColumns)
+		ctxLogger.Debug(ctx, "removing columns from table", zap.String("table", table), zap.String("query", removeStmt))
+		_, err := s.sql.ExecContext(ctx, removeStmt)
+		if err != nil {
+			return err
+		}
+
+	}
+	return nil
+}
+
+func getColumns(ctx context.Context, db *sqlx.DB, dataset, table string) ([]*sql.ColumnType, error) {
+	if db == nil {
+		return nil, nil
+	}
+	rows, err := db.QueryxContext(ctx, fmt.Sprintf("SELECT * FROM %s.%s limit 1;", dataset, table))
+	if err != nil {
+		return nil, err
+	}
+	cols, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+	return cols, nil
+}
+
+func generateColumnTypeStatements(alterTable, columnType string, e []*sql.ColumnType) string {
+	output := []string{}
+	for _, el := range e {
+		output = append(output, generateColumnTypeStmt(columnType, el))
+	}
+	return fmt.Sprintf("%s %s;", alterTable, strings.Join(output, ","))
+
+}
+
+func generateColumnStatements(alterTable, columnType string, e []*Column) string {
+	output := []string{}
+	for _, el := range e {
+		output = append(output, generateColumnStmt(columnType, el))
+	}
+	return fmt.Sprintf("%s %s;", alterTable, strings.Join(output, ","))
+
+}
+func generateColumnStmt(columnType string, e *Column) string {
+	switch strings.ToLower(columnType) {
+	case "drop":
+		return fmt.Sprintf("DROP COLUMN %s;", e.Name)
+	case "add":
+		return fmt.Sprintf("ADD %s", e.GetDefinition())
+	}
+	return ""
+}
+
+func generateColumnTypeStmt(columnType string, e *sql.ColumnType) string {
+	switch strings.ToLower(columnType) {
+	case "drop":
+		return fmt.Sprintf("DROP COLUMN %s", e.Name())
+	case "add":
+		return fmt.Sprintf("ADD %s", e.Name())
+	}
+	return ""
 }
