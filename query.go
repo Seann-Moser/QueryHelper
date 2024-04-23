@@ -289,7 +289,8 @@ func (q *Query[T]) Build() *Query[T] {
 	case QueryTypeSQL:
 		fallthrough
 	default:
-		return q.buildSqlQuery()
+		query := q.buildSqlQuery()
+		return query
 	}
 	return q
 }
@@ -297,6 +298,7 @@ func (q *Query[T]) SetName(name string) *Query[T] {
 	q.Name = name
 	return q
 }
+
 func (q *Query[T]) getName() string {
 	if len(q.Name) != 0 {
 		return q.Name
@@ -362,15 +364,24 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 	if q.err != nil {
 		return nil, q.err
 	}
+	if q.Name != "" {
+		query, err := ctx_cache.Get[string](ctx, "queries", q.Name)
+		if err == nil && *query != "" {
+			q.Query = *query
+		}
+	}
+
 	if len(q.Query) == 0 {
 		q.Build()
+	}
+	if q.Name != "" {
+		_ = ctx_cache.SetWithExpiration[string](ctx, 30*time.Minute, "queries", q.Name, q.Query)
 	}
 	ctx = CtxWithQueryTag(ctx, q.getName())
 	cacheKey := q.GetCacheKey(args...)
 
-	MonitorCache.CacheTable(q.FromTable.FullTableName(), cacheKey)
 	if q.Cache != nil {
-		data, err := ctx_cache.GetFromCache[[]*T](ctx, q.Cache, cacheKey)
+		data, err := ctx_cache.GetFromCache[[]*T](ctx, q.Cache, q.FromTable.FullTableName(), cacheKey)
 		if err == nil && len(*data) > 0 {
 			return *data, nil
 		}
@@ -382,7 +393,7 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 	}
 
 	if q.Cache != nil {
-		_ = ctx_cache.SetFromCache[[]*T](ctx, q.Cache, cacheKey, data)
+		_ = ctx_cache.SetFromCache[[]*T](ctx, q.Cache, q.FromTable.FullTableName(), cacheKey, data)
 	}
 
 	return data, nil

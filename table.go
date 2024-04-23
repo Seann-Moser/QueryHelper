@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/Seann-Moser/ctx_cache"
 	"reflect"
 	"regexp"
 	"sort"
@@ -578,9 +579,6 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 	if db == nil {
 		return "", nil
 	}
-	defer func() {
-		MonitorCache.PublishUpdate(ctx, t.FullTableName())
-	}()
 	if t.IsAutoGenerateID() {
 		generateIds := t.GenerateID()
 		args := map[string]interface{}{}
@@ -596,6 +594,9 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 			}
 		}
 		err := db.ExecContext(ctx, t.InsertStatement(len(s)), args)
+		if err == nil {
+			_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+		}
 		return generateIds[t.GetGenerateID()[0].Name], err
 	}
 
@@ -604,6 +605,9 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 		return "", err
 	}
 	err = db.ExecContext(ctx, t.InsertStatement(len(s)), args)
+	if err == nil {
+		_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+	}
 	return "", err
 }
 
@@ -611,9 +615,6 @@ func (t *Table[T]) InsertTx(ctx context.Context, db *sqlx.Tx, s ...T) (sql.Resul
 	if db == nil {
 		return nil, "", nil
 	}
-	defer func() {
-		MonitorCache.PublishUpdate(ctx, t.FullTableName())
-	}()
 	if t.IsAutoGenerateID() {
 		generateIds := t.GenerateID()
 		args, err := combineStructs(generateIds, s)
@@ -634,22 +635,24 @@ func (t *Table[T]) Delete(ctx context.Context, db DB, s T) error {
 	if db == nil {
 		return nil
 	}
-	//tableUpdateSignal <- t.FullTableName()
-	defer func() {
-		MonitorCache.PublishUpdate(ctx, t.FullTableName())
-	}()
-	return db.ExecContext(ctx, t.DeleteStatement(), s)
+	err := db.ExecContext(ctx, t.DeleteStatement(), s)
+	if err != nil {
+		return err
+	}
+	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+	return nil
 }
 
 func (t *Table[T]) DeleteTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, error) {
 	if db == nil {
 		return nil, nil
 	}
-	//tableUpdateSignal <- t.FullTableName()
-	defer func() {
-		MonitorCache.PublishUpdate(ctx, t.FullTableName())
-	}()
-	return db.NamedExecContext(ctx, t.DeleteStatement(), s)
+	r, err := db.NamedExecContext(ctx, t.DeleteStatement(), s)
+	if err != nil {
+		return r, err
+	}
+	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+	return r, nil
 }
 
 func (t *Table[T]) Update(ctx context.Context, db DB, s T) error {
@@ -659,11 +662,12 @@ func (t *Table[T]) Update(ctx context.Context, db DB, s T) error {
 	if db == nil {
 		return nil
 	}
-	//tableUpdateSignal <- t.FullTableName()
-	defer func() {
-		MonitorCache.PublishUpdate(ctx, t.FullTableName())
-	}()
-	return db.ExecContext(ctx, t.UpdateStatement(), s)
+	err := db.ExecContext(ctx, t.UpdateStatement(), s)
+	if err != nil {
+		return err
+	}
+	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+	return nil
 }
 
 func (t *Table[T]) UpdateTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, error) {
@@ -671,10 +675,12 @@ func (t *Table[T]) UpdateTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, 
 		return nil, nil
 	}
 	//tableUpdateSignal <- t.FullTableName()
-	defer func() {
-		MonitorCache.PublishUpdate(ctx, t.FullTableName())
-	}()
-	return db.NamedExecContext(ctx, t.UpdateStatement(), s)
+	r, err := db.ExecContext(ctx, t.UpdateStatement(), s)
+	if err != nil {
+		return nil, err
+	}
+	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+	return r, nil
 }
 
 func NamedQuery(ctx context.Context, db DB, query string, args ...interface{}) (DBRow, error) {

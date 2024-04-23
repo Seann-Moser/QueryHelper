@@ -69,12 +69,17 @@ func TestQuery_BuildGroupBy(t *testing.T) {
 	//	Build()
 	//
 	//println(qs.Query)
-
 	qt := QueryTable[Answer](answerTable)
-	qt.Select(qt.Column("uid").Wrap("count(distinct %s)").As("id")).
+	qt.Select(qt.Column("uid").Wrap("count(distinct %s)").As("id")).SetName("test-anwser").
 		Where(qt.Column("survey_id"), "=", "AND", 0, "test_id").
 		Build()
 	println(qt.Query)
+
+	qttest := QueryTable[Answer](answerTable)
+	qt.Select(qt.Column("uid").Wrap("count(distinct %s)").As("id")).SetName("test-anwser").
+		Where(qt.Column("survey_id"), "=", "AND", 0, "test_id").
+		Build()
+	println(qttest.Query)
 	//	args := q.Args(nil)
 	//table.Insert(context.Background(), nil, Resource{}, Resource{})
 
