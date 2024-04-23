@@ -289,7 +289,8 @@ func (q *Query[T]) Build() *Query[T] {
 	case QueryTypeSQL:
 		fallthrough
 	default:
-		return q.buildSqlQuery()
+		query := q.buildSqlQuery()
+		return query
 	}
 	return q
 }
@@ -363,9 +364,18 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 	if q.err != nil {
 		return nil, q.err
 	}
+	if q.Name != "" {
+		query, err := ctx_cache.Get[string](ctx, "queries", q.Name)
+		if err == nil && *query != "" {
+			q.Query = *query
+		}
+	}
+
 	if len(q.Query) == 0 {
-		//todo cache build
 		q.Build()
+	}
+	if q.Name != "" {
+		_ = ctx_cache.SetWithExpiration[string](ctx, 30*time.Minute, "queries", q.Name, q.Query)
 	}
 	ctx = CtxWithQueryTag(ctx, q.getName())
 	cacheKey := q.GetCacheKey(args...)
