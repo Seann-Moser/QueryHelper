@@ -297,6 +297,7 @@ func (q *Query[T]) SetName(name string) *Query[T] {
 	q.Name = name
 	return q
 }
+
 func (q *Query[T]) getName() string {
 	if len(q.Name) != 0 {
 		return q.Name
@@ -363,14 +364,14 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 		return nil, q.err
 	}
 	if len(q.Query) == 0 {
+		//todo cache build
 		q.Build()
 	}
 	ctx = CtxWithQueryTag(ctx, q.getName())
 	cacheKey := q.GetCacheKey(args...)
 
-	MonitorCache.CacheTable(q.FromTable.FullTableName(), cacheKey)
 	if q.Cache != nil {
-		data, err := ctx_cache.GetFromCache[[]*T](ctx, q.Cache, cacheKey)
+		data, err := ctx_cache.GetFromCache[[]*T](ctx, q.Cache, q.FromTable.FullTableName(), cacheKey)
 		if err == nil && len(*data) > 0 {
 			return *data, nil
 		}
@@ -382,7 +383,7 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 	}
 
 	if q.Cache != nil {
-		_ = ctx_cache.SetFromCache[[]*T](ctx, q.Cache, cacheKey, data)
+		_ = ctx_cache.SetFromCache[[]*T](ctx, q.Cache, q.FromTable.FullTableName(), cacheKey, data)
 	}
 
 	return data, nil
