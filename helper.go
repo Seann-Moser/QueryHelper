@@ -170,6 +170,23 @@ func combineStructs(i ...interface{}) (map[string]interface{}, error) {
 	return output, nil
 }
 
+func combinePrefixStructs(prefix string, i ...interface{}) (map[string]interface{}, error) {
+	output := map[string]interface{}{}
+	for _, s := range i {
+		b, err := json.Marshal(s)
+		if err != nil {
+			return nil, err
+		}
+		t := map[string]interface{}{}
+		err = json.Unmarshal(b, &t)
+		if err != nil {
+			return nil, err
+		}
+		output = JoinMaps(output, t)
+	}
+	return output, nil
+}
+
 func JoinMapsWithPrefix[T any](prefix string, m ...map[string]T) map[string]T {
 	output := map[string]T{}
 	for index, currentMap := range m {
