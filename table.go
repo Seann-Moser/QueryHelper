@@ -375,6 +375,20 @@ func ArrayWithPrefix(prefix string, list []string) []string {
 	return rows
 }
 
+func (t *Table[T]) UpsertStatement(amount int) string {
+	insert := strings.TrimSuffix(t.InsertStatement(amount), ";")
+	onDuplicate := `ON DUPLICATE KEY UPDATE`
+	var setValues []string
+
+	for _, e := range t.Columns {
+		if !e.Update {
+			continue
+		}
+		setValues = append(setValues, fmt.Sprintf("%s = VALUES(%s)", e.Name, e.Name))
+	}
+	return fmt.Sprintf("%s\n%s\n%s", insert, onDuplicate, strings.Join(setValues, ",\n"))
+}
+
 func (t *Table[T]) UpdateStatement() string {
 	var setValues []string
 	var whereValues []string
@@ -605,6 +619,44 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 		return "", err
 	}
 	err = db.ExecContext(ctx, t.InsertStatement(len(s)), args)
+	if err == nil {
+		_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+	}
+	return "", err
+}
+
+func (t *Table[T]) Upsert(ctx context.Context, db DB, s ...T) (string, error) {
+	if db == nil {
+		db = t.db
+	}
+	if db == nil {
+		return "", nil
+	}
+	if t.IsAutoGenerateID() {
+		generateIds := t.GenerateID()
+		args := map[string]interface{}{}
+		for rowIndex, i := range s {
+			tmpArgs, err := combineStructs(generateIds, i)
+			if err != nil {
+				return "", err
+			}
+			tmpArgs = AddPrefix(fmt.Sprintf("%d_", rowIndex), tmpArgs)
+			args, err = combineStructs(args, tmpArgs)
+			if err != nil {
+				return "", err
+			}
+		}
+		err := db.ExecContext(ctx, t.UpsertStatement(len(s)), args)
+		if err == nil {
+			_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+		}
+		return generateIds[t.GetGenerateID()[0].Name], err
+	}
+	args, err := combineStructsWithPrefix[T](s...)
+	if err != nil {
+		return "", err
+	}
+	err = db.ExecContext(ctx, t.UpsertStatement(len(s)), args)
 	if err == nil {
 		_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
 	}

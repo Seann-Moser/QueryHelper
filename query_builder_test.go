@@ -1,6 +1,8 @@
 package QueryHelper
 
 import (
+	"fmt"
+	"github.com/google/uuid"
 	"testing"
 )
 
@@ -84,4 +86,67 @@ func TestQuery_BuildGroupBy(t *testing.T) {
 	//table.Insert(context.Background(), nil, Resource{}, Resource{})
 
 	//println(args)
+}
+
+func TestQuery_Upsert(t *testing.T) {
+	answerTable, err := NewTable[Answer]("test", QueryTypeSQL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	upsert := answerTable.UpsertStatement(10)
+	println(upsert)
+
+}
+
+var table = []struct {
+	input int
+}{
+	{input: 1},
+	{input: 100},
+}
+
+func BenchmarkCombineStructs(b *testing.B) {
+	for _, v := range table {
+		anwers := make([]Answer, v.input)
+		var output []interface{}
+		for _, a := range anwers {
+			a.UID = uuid.New().String()
+			a.QuestionID = uuid.New().String()
+			output = append(output, a)
+		}
+		b.Run(fmt.Sprintf("combining data_%d", v.input), func(b *testing.B) {
+			_, _ = combineStructs(output...)
+		})
+	}
+
+}
+
+func BenchmarkCombineStructsInsert(b *testing.B) {
+	answerTable, err := NewTable[Answer]("test", QueryTypeSQL)
+	if err != nil {
+
+	}
+	for _, v := range table {
+		anwers := make([]Answer, v.input)
+		for _, a := range anwers {
+			a.UID = uuid.New().String()
+			a.QuestionID = uuid.New().String()
+		}
+		b.Run(fmt.Sprintf("combining data_%d", v.input), func(b *testing.B) {
+			generateIds := answerTable.GenerateID()
+			args := map[string]interface{}{}
+			for rowIndex, i := range anwers {
+				tmpArgs, err := combineStructs(generateIds, i)
+				if err != nil {
+					return
+				}
+				tmpArgs = AddPrefix(fmt.Sprintf("%d_", rowIndex), tmpArgs)
+				args, err = combineStructs(args, tmpArgs)
+				if err != nil {
+					return
+				}
+			}
+		})
+	}
+
 }

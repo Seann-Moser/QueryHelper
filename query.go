@@ -360,6 +360,10 @@ func (q *Query[T]) RunSingle(ctx context.Context, db DB, args ...interface{}) (*
 	return rows[0], nil
 }
 
+func (q *Query[T]) RunCtx(ctx context.Context) ([]*T, error) {
+	return q.Run(ctx, nil)
+}
+
 func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, error) {
 	if q.err != nil {
 		return nil, q.err
