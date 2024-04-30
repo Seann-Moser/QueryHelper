@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/Seann-Moser/ctx_cache"
+	"go.opentelemetry.io/otel"
 	"reflect"
 	"strings"
 	"time"
@@ -374,7 +375,6 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 			q.Query = *query
 		}
 	}
-
 	if len(q.Query) == 0 {
 		q.Build()
 	}
@@ -390,9 +390,12 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 			return *data, nil
 		}
 	}
-
+	tracer := otel.GetTracerProvider()
+	ctx, span := tracer.Tracer("query").Start(ctx, fmt.Sprintf("%s-%s", q.Name, q.FromTable.FullTableName()))
+	defer span.End()
 	data, err := q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
 	if err != nil {
+		span.RecordError(err)
 		return nil, err
 	}
 

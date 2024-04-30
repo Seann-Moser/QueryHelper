@@ -124,7 +124,7 @@ func BenchmarkCombineStructs(b *testing.B) {
 func BenchmarkCombineStructsInsert(b *testing.B) {
 	answerTable, err := NewTable[Answer]("test", QueryTypeSQL)
 	if err != nil {
-
+		b.Fatal(err)
 	}
 	for _, v := range table {
 		anwers := make([]Answer, v.input)
