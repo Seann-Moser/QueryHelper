@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Seann-Moser/ctx_cache"
+	"go.opentelemetry.io/otel"
 	"reflect"
 	"regexp"
 	"sort"
@@ -437,6 +438,9 @@ func (t *Table[T]) DeleteWithColumns(ctx context.Context, fullTableName string, 
 	if c := t.GetCommonColumns(columns); len(c) == 0 {
 		return nil
 	}
+	tracer := otel.GetTracerProvider()
+	ctx, span := tracer.Tracer("delete-w-column").Start(ctx, t.FullTableName())
+	defer span.End()
 	//tableUpdateSignal <- t.FullTableName()
 	return t.db.ExecContext(ctx, DeleteStatement(fullTableName, columns), s)
 }
@@ -593,6 +597,9 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 	if db == nil {
 		return "", nil
 	}
+	tracer := otel.GetTracerProvider()
+	ctx, span := tracer.Tracer("insert").Start(ctx, t.FullTableName())
+	defer span.End()
 	if t.IsAutoGenerateID() {
 		generateIds := t.GenerateID()
 		args := map[string]interface{}{}
@@ -609,6 +616,7 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 		}
 		err := db.ExecContext(ctx, t.InsertStatement(len(s)), args)
 		if err == nil {
+			span.RecordError(err)
 			_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
 		}
 		return generateIds[t.GetGenerateID()[0].Name], err
@@ -616,10 +624,12 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 
 	args, err := combineStructsWithPrefix[T](s...)
 	if err != nil {
+		span.RecordError(err)
 		return "", err
 	}
 	err = db.ExecContext(ctx, t.InsertStatement(len(s)), args)
 	if err == nil {
+		span.RecordError(err)
 		_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
 	}
 	return "", err
@@ -632,6 +642,9 @@ func (t *Table[T]) Upsert(ctx context.Context, db DB, s ...T) (string, error) {
 	if db == nil {
 		return "", nil
 	}
+	tracer := otel.GetTracerProvider()
+	ctx, span := tracer.Tracer("upsert").Start(ctx, t.FullTableName())
+	defer span.End()
 	if t.IsAutoGenerateID() {
 		generateIds := t.GenerateID()
 		args := map[string]interface{}{}
@@ -648,6 +661,7 @@ func (t *Table[T]) Upsert(ctx context.Context, db DB, s ...T) (string, error) {
 		}
 		err := db.ExecContext(ctx, t.UpsertStatement(len(s)), args)
 		if err == nil {
+			span.RecordError(err)
 			_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
 		}
 		return generateIds[t.GetGenerateID()[0].Name], err
@@ -658,6 +672,7 @@ func (t *Table[T]) Upsert(ctx context.Context, db DB, s ...T) (string, error) {
 	}
 	err = db.ExecContext(ctx, t.UpsertStatement(len(s)), args)
 	if err == nil {
+		span.RecordError(err)
 		_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
 	}
 	return "", err
@@ -687,8 +702,12 @@ func (t *Table[T]) Delete(ctx context.Context, db DB, s T) error {
 	if db == nil {
 		return nil
 	}
+	tracer := otel.GetTracerProvider()
+	ctx, span := tracer.Tracer("delete").Start(ctx, t.FullTableName())
+	defer span.End()
 	err := db.ExecContext(ctx, t.DeleteStatement(), s)
 	if err != nil {
+		span.RecordError(err)
 		return err
 	}
 	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
@@ -714,8 +733,12 @@ func (t *Table[T]) Update(ctx context.Context, db DB, s T) error {
 	if db == nil {
 		return nil
 	}
+	tracer := otel.GetTracerProvider()
+	ctx, span := tracer.Tracer("update").Start(ctx, t.FullTableName())
+	defer span.End()
 	err := db.ExecContext(ctx, t.UpdateStatement(), s)
 	if err != nil {
+		span.RecordError(err)
 		return err
 	}
 	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
