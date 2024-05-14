@@ -8,12 +8,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/Seann-Moser/ctx_cache"
-	"go.opentelemetry.io/otel"
 	"reflect"
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/Seann-Moser/ctx_cache"
+	"go.opentelemetry.io/otel"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -572,6 +573,7 @@ func (t *Table[T]) generateJoinStmt(columns map[string]Column, JoinType string) 
 			tableJoins[column.FullTableName()] = append(tableJoins[column.FullTableName()], joinStmt)
 		}
 	}
+
 	output := ""
 	for _, v := range tableJoins {
 		output += strings.Join(v, " AND ") + "\n"

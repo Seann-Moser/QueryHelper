@@ -3,7 +3,7 @@ module github.com/Seann-Moser/QueryHelper
 go 1.21.4
 
 require (
-	github.com/Seann-Moser/ctx_cache v1.0.12
+	github.com/Seann-Moser/ctx_cache v1.0.14
 	github.com/Seann-Moser/go-serve v0.7.86
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.4.0

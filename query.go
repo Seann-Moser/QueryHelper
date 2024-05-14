@@ -6,11 +6,12 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"github.com/Seann-Moser/ctx_cache"
-	"go.opentelemetry.io/otel"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/Seann-Moser/ctx_cache"
+	"go.opentelemetry.io/otel"
 )
 
 //type CacheMonitor struct {
@@ -81,6 +82,7 @@ type Query[T any] struct {
 	LimitCount            int
 
 	Cache         ctx_cache.Cache
+	useCache      bool
 	Query         string
 	skipCache     bool
 	CacheDuration time.Duration
@@ -135,6 +137,7 @@ func QueryTable[T any](table *Table[T]) *Query[T] {
 		OrderByStmt:           make([]Column, 0),
 		MapKeyColumns:         make([]Column, 0),
 		WhereColumns:          map[string]int{},
+		CacheDuration:         0,
 		LimitCount:            0,
 		Cache:                 nil,
 		Query:                 "",
@@ -283,6 +286,10 @@ func (q *Query[T]) SetCache(cache ctx_cache.Cache) *Query[T] {
 	q.Cache = cache
 	return q
 }
+func (q *Query[T]) UseCache() *Query[T] {
+	q.useCache = true
+	return q
+}
 
 func (q *Query[T]) Build() *Query[T] {
 	switch q.FromTable.QueryType {
@@ -390,6 +397,14 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 			return *data, nil
 		}
 	}
+	if q.useCache {
+		tracer := otel.GetTracerProvider()
+		ctx, span := tracer.Tracer("query-ctx").Start(ctx, fmt.Sprintf("%s-%s", q.Name, q.FromTable.FullTableName()))
+		defer span.End()
+		return ctx_cache.GetSet[[]*T](ctx, q.CacheDuration, q.FromTable.FullTableName(), cacheKey, func(ctx context.Context) ([]*T, error) {
+			return q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
+		})
+	}
 	tracer := otel.GetTracerProvider()
 	ctx, span := tracer.Tracer("query").Start(ctx, fmt.Sprintf("%s-%s", q.Name, q.FromTable.FullTableName()))
 	defer span.End()
@@ -398,11 +413,9 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 		span.RecordError(err)
 		return nil, err
 	}
-
 	if q.Cache != nil {
 		_ = ctx_cache.SetFromCache[[]*T](ctx, q.Cache, q.FromTable.FullTableName(), cacheKey, data)
 	}
-
 	return data, nil
 }
 
@@ -445,6 +458,7 @@ func (q *Query[T]) GetCacheKey(args ...interface{}) string {
 
 	return GetMD5Hash(strings.Join(keys, ""))
 }
+
 func GetMD5Hash(text string) string {
 	hash := md5.Sum([]byte(text))
 	return hex.EncodeToString(hash[:])
