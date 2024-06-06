@@ -9,21 +9,48 @@ import (
 
 var (
 	ErrTableNotInCtx = errors.New("table is missing from context")
+	ErrDBNotInCtx    = errors.New("db is missing from context")
 )
 
 type tableCtxName string
+type DBCtxName string
+
+const DBContext = "db-base-context"
 
 func AddTableCtx[T any](ctx context.Context, db DB, dataset string, queryType QueryType, suffix ...string) (context.Context, error) {
 	table, err := NewTable[T](dataset, queryType)
 	if err != nil {
 		return ctx, err
 	}
+	if _, err := GetDBContext(ctx, ""); err != nil {
+		AddDBContext(ctx, DBContext, db)
+	}
+
 	err = table.InitializeTable(ctx, db, suffix...)
 	if err != nil {
 		return nil, err
 	}
 	ctx = context.WithValue(ctx, tableCtxName(table.Name), table)
 	return ctx, nil
+}
+
+func AddDBContext(ctx context.Context, name string, db DB) context.Context {
+	if name == "" {
+		name = DBContext
+	}
+	ctx = context.WithValue(ctx, DBCtxName(name), db)
+	return ctx
+}
+
+func GetDBContext(ctx context.Context, name string) (DB, error) {
+	if name == "" {
+		name = DBContext
+	}
+	value := ctx.Value(DBCtxName(name))
+	if value == nil {
+		return nil, ErrDBNotInCtx
+	}
+	return value.(DB), nil
 }
 
 func GetTableCtx[T any](ctx context.Context, suffix ...string) (*Table[T], error) {
