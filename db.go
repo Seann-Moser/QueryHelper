@@ -3,6 +3,29 @@ package QueryHelper
 import (
 	"context"
 	"fmt"
+	"github.com/xwb1989/sqlparser"
+	"regexp"
+	"strings"
+)
+
+var (
+	// List of reserved keywords
+	reservedKeywords = []string{
+		"ADD", "ALL", "ALTER", "AND", "ANY", "AS", "ASC", "BACKUP", "BETWEEN",
+		"CASE", "CHECK", "COLUMN", "CONSTRAINT", "CREATE", "DATABASE", "DEFAULT",
+		"DELETE", "DESC", "DISTINCT", "DROP", "EXEC", "EXISTS", "FOREIGN", "FROM",
+		"FULL", "GROUP", "HAVING", "IN", "INDEX", "INNER", "INSERT", "IS", "JOIN",
+		"KEY", "LEFT", "LIKE", "LIMIT", "NOT", "NULL", "OR", "ORDER", "OUTER",
+		"PRIMARY", "PROCEDURE", "RIGHT", "ROWNUM", "SELECT", "SET", "TABLE", "TOP",
+		"TRUNCATE", "UNION", "UNIQUE", "UPDATE", "VALUES", "VIEW", "WHERE",
+	}
+
+	// Regex patterns for invalid column names
+	patterns = []string{
+		`^\d+.*`,     // Starts with a number
+		`.*\s+.*`,    // Contains space
+		`.*[-\.@].*`, // Contains dash, dot, or at-sign
+	}
 )
 
 type DB interface {
@@ -50,16 +73,25 @@ func (m MockDB) CreateTable(ctx context.Context, dataset, table string, columns 
 		dataset: dataset,
 		columns: columns,
 	}
+	for _, col := range columns {
+		if !isValidColumnName(col.Name) {
+			return fmt.Errorf("column name %s is not valid", col.Name)
+		}
+	}
 	return nil
 }
 
 func (m MockDB) QueryContext(ctx context.Context, query string, args interface{}) (DBRow, error) {
-	// todo new row
+	if valid, err := isSQLValid(query); err != nil && !valid {
+		return nil, fmt.Errorf("invalid query %s: %v", query, err)
+	}
 	return nil, nil
 }
 
 func (m MockDB) ExecContext(ctx context.Context, query string, args interface{}) error {
-	// todo new row
+	if valid, err := isSQLValid(query); err != nil && !valid {
+		return fmt.Errorf("invalid query %s: %v", query, err)
+	}
 	return nil
 }
 
@@ -67,3 +99,27 @@ func (m MockDB) Close() {
 }
 
 var _ DB = MockDB{}
+
+func isSQLValid(sql string) (bool, error) {
+	_, err := sqlparser.Parse(sql)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func isValidColumnName(columnName string) bool {
+	for _, keyword := range reservedKeywords {
+		if strings.ToUpper(columnName) == keyword {
+			return false
+		}
+	}
+
+	for _, pattern := range patterns {
+		matched, _ := regexp.MatchString(pattern, columnName)
+		if matched {
+			return false
+		}
+	}
+	return true
+}
