@@ -101,6 +101,11 @@ func ToSnakeCase(str string) string {
 	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
 	return strings.ToLower(snake)
 }
+
+func (t *Table[T]) GetDB() DB {
+	return t.db
+}
+
 func (t *Table[T]) GetPrimary() []Column {
 	var primaryColumns []Column
 	for _, c := range t.Columns {
