@@ -2,6 +2,8 @@ package QueryHelper
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -213,6 +215,10 @@ func TestQuery_GroupBy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = NewMockDB().CreateTable(context.Background(), "test", auditTable.Name, auditTable.Columns)
+	if err != nil {
+		t.Fatal(err)
+	}
 	auditQuery := QueryTable[AuditLog](auditTable).
 		Select(
 			auditTable.GetColumn("id"),
@@ -225,6 +231,10 @@ func TestQuery_GroupBy(t *testing.T) {
 
 	auditQuery.Where(auditTable.GetColumn("created_timestamp"), ">=", "AND", 0, time.Now().Format("2006-01-02T15:04:05"))
 	auditQuery.Build()
+	_, err = auditQuery.Run(context.Background(), NewMockDB())
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		t.Fatal(err)
+	}
 	println(auditQuery.Query)
 
 }
