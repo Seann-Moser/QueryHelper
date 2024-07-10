@@ -132,7 +132,7 @@ func (t *Table[T]) InitializeTable(ctx context.Context, db DB, suffix ...string)
 		return fmt.Errorf("no db set")
 	}
 	t.Name = strings.Join(append([]string{t.Name}, suffix...), "_")
-	err := db.CreateTable(ctx, t.Dataset, t.Name, t.Columns)
+	err := db.CreateTable(ctx, db.GetDataset(t.Dataset), t.Name, t.Columns)
 	if err != nil {
 		return err
 	}
@@ -140,7 +140,10 @@ func (t *Table[T]) InitializeTable(ctx context.Context, db DB, suffix ...string)
 }
 
 func (t *Table[T]) FullTableName() string {
-	return fmt.Sprintf("%s.%s", t.Dataset, t.Name)
+	if t.db == nil {
+		return fmt.Sprintf("%s.%s", t.Dataset, t.Name)
+	}
+	return fmt.Sprintf("%s.%s", t.db.GetDataset(t.Dataset), t.Name)
 }
 
 func (t *Table[T]) WhereValues(whereElementsStr ...string) []string {

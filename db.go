@@ -34,6 +34,7 @@ type DB interface {
 	QueryContext(ctx context.Context, query string, args interface{}) (DBRow, error)
 	ExecContext(ctx context.Context, query string, args interface{}) error
 	Close()
+	GetDataset(ds string) string
 }
 
 type DBRow interface {
@@ -44,6 +45,10 @@ type DBRow interface {
 type MockDB struct {
 	tables   map[string]*mockTable
 	mockData map[string]map[string]*mockData
+}
+
+func (m MockDB) GetDataset(ds string) string {
+	return fmt.Sprintf(ds)
 }
 
 type mockTable struct {

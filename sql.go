@@ -19,17 +19,20 @@ var _ DB = &SqlDB{}
 type SqlDB struct {
 	sql           *sqlx.DB
 	updateColumns bool
+	tablePrefix   string
 }
 
 func Flags() *pflag.FlagSet {
 	fs := pflag.NewFlagSet("sql-db", pflag.ExitOnError)
 	fs.Bool("sql-db-update-columns", false, "")
+	fs.String("sql-db-prefix", "", "")
 	return fs
 }
 func NewSql(db *sqlx.DB) *SqlDB {
 	return &SqlDB{
 		sql:           db,
 		updateColumns: viper.GetBool("sql-db-update-columns"),
+		tablePrefix:   viper.GetString("sql-db-table-prefix"),
 	}
 }
 
@@ -39,6 +42,10 @@ func (s *SqlDB) Ping(ctx context.Context) error {
 
 func (s *SqlDB) Close() {
 	_ = s.sql.Close()
+}
+
+func (s *SqlDB) GetDataset(ds string) string {
+	return fmt.Sprintf("%s%s", s.tablePrefix, ds)
 }
 
 func (s *SqlDB) CreateTable(ctx context.Context, dataset, table string, columns map[string]Column) error {
