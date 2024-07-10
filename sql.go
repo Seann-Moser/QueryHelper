@@ -32,7 +32,7 @@ func NewSql(db *sqlx.DB) *SqlDB {
 	return &SqlDB{
 		sql:           db,
 		updateColumns: viper.GetBool("sql-db-update-columns"),
-		tablePrefix:   viper.GetString("sql-db-table-prefix"),
+		tablePrefix:   viper.GetString("sql-db-prefix"),
 	}
 }
 
