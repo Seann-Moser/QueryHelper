@@ -84,7 +84,7 @@ func TestQuery_BuildGroupBy(t *testing.T) {
 	println(qttest.Query)
 	//	args := q.Args(nil)
 	//table.Insert(context.Background(), nil, Resource{}, Resource{})
-
+	//
 	//println(args)
 }
 

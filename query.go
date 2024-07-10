@@ -87,6 +87,13 @@ type Query[T any] struct {
 	skipCache     bool
 	CacheDuration time.Duration
 	WhereColumns  map[string]int
+
+	Pagination struct {
+		Limit              int
+		Offset             int
+		PreviousPageColumn Column
+		PreviewColumnValue interface{}
+	}
 }
 
 type JoinStmt struct {

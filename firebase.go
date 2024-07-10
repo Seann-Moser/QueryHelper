@@ -10,6 +10,11 @@ type FirebaseDB struct {
 	//client *firebase.Client
 }
 
+func (f FirebaseDB) GetDataset(ds string) string {
+	//TODO implement me
+	panic("implement me")
+}
+
 func NewFirebaseDB() *FirebaseDB {
 	return &FirebaseDB{}
 }
