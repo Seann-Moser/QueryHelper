@@ -10,6 +10,7 @@ type Column struct {
 	Table       string `json:"-"`
 	Dataset     string `json:"-"`
 	ColumnOrder int    `json:"-"`
+	Prefix      string `json:"-"`
 
 	Primary           bool   `json:"primary"`
 	Skip              bool   `json:"skip"`
@@ -44,6 +45,11 @@ type Column struct {
 
 func (c Column) Wrap(wrap string) Column {
 	c.Wrapper = wrap
+	return c
+}
+
+func (c Column) SetDataset(d string) Column {
+	c.Dataset = d
 	return c
 }
 
