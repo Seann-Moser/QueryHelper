@@ -45,9 +45,13 @@ type DBRow interface {
 type MockDB struct {
 	tables   map[string]*mockTable
 	mockData map[string]map[string]*mockData
+	prefix   string
 }
 
 func (m MockDB) GetDataset(ds string) string {
+	if len(m.prefix) > 0 {
+		return m.prefix + ds
+	}
 	return fmt.Sprintf(ds)
 }
 

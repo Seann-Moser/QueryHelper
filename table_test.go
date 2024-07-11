@@ -102,15 +102,19 @@ func TestTableJoin2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	sql, err := fullTable.SelectJoinStmt("", nil, false, GuestRequestsTable.Columns)
+	GuestRequestsTable.InitializeTable(context.Background(), MockDB{
+		tables:   make(map[string]*mockTable),
+		mockData: make(map[string]map[string]*mockData),
+		prefix:   "qa_",
+	})
+	sql, err := fullTable.SelectJoinStmt("", nil, false, GuestRequestsTable.GetColumns())
 	if err != nil {
 		t.Fatal(err)
 	}
 	println(sql)
 
 	questionsQuery := QueryTable[Question](fullTable).
-		Join(GuestRequestsTable.Columns, "").
+		Join(GuestRequestsTable.GetColumns(), "").
 		Where(GuestRequestsTable.GetColumn("survey_id"), "=", "AND", 0, "").
 		Build()
 	println(questionsQuery.Query)
@@ -127,7 +131,7 @@ func TestTableJoin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sql, err := fullTable.SelectJoinStmt("", nil, false, GuestRequestsTable.Columns)
+	sql, err := fullTable.SelectJoinStmt("", nil, false, GuestRequestsTable.GetColumns())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +139,7 @@ func TestTableJoin(t *testing.T) {
 
 	query := QueryTable[FullTestStruct](fullTable).
 		//Select(fullTable.GetColumn("book_id"), fullTable.GetColumn("number")).
-		Join(GuestRequestsTable.Columns, "LEFT").
+		Join(GuestRequestsTable.GetColumns(), "LEFT").
 		Where(fullTable.GetColumn("chapter_id"), "in", "", 2, nil).
 		Where(fullTable.GetColumn("language"), "=", "", 1, nil).
 		GroupBy(fullTable.GetColumn("book_id")).
@@ -199,7 +203,7 @@ func TestTableWhereGroupingCtx(t *testing.T) {
 	}
 
 	permisisonsQuery := QueryTable[Permissions](permissionsTable).
-		Join(rolePermissionsTable.Columns, "LEFT").
+		Join(rolePermissionsTable.GetColumns(), "LEFT").
 		Where(rolePermissionsTable.GetColumn("role_id"), "in", "AND", 0, strings.Join([]string{}, ",")).
 		Where(permissionsTable.GetColumn("service"), "in", "AND", 0, strings.Join([]string{"", "", "default"}, ",")).
 		Where(permissionsTable.GetColumn("path"), "=", "AND", 0, "").
@@ -215,7 +219,7 @@ func TestQuery_GroupBy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = NewMockDB().CreateTable(context.Background(), "test", auditTable.Name, auditTable.Columns)
+	err = NewMockDB().CreateTable(context.Background(), "test", auditTable.Name, auditTable.GetColumns())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -108,7 +108,7 @@ func (t *Table[T]) GetDB() DB {
 
 func (t *Table[T]) GetPrimary() []Column {
 	var primaryColumns []Column
-	for _, c := range t.Columns {
+	for _, c := range t.GetColumns() {
 		if c.Primary {
 			primaryColumns = append(primaryColumns, c)
 		}
@@ -118,7 +118,7 @@ func (t *Table[T]) GetPrimary() []Column {
 }
 
 func (t *Table[T]) GetColumn(name string) Column {
-	if column, found := t.Columns[ToSnakeCase(name)]; found {
+	if column, found := t.GetColumns()[ToSnakeCase(name)]; found {
 		return column
 	}
 	return Column{}
@@ -137,6 +137,19 @@ func (t *Table[T]) InitializeTable(ctx context.Context, db DB, suffix ...string)
 		return err
 	}
 	return nil
+}
+
+func (t *Table[T]) GetColumns() map[string]Column {
+	c := map[string]Column{}
+	if t.db == nil {
+		return t.Columns
+	}
+	for k, v := range t.Columns {
+		ts := v
+		ts.Dataset = t.db.GetDataset(t.Dataset)
+		c[k] = ts
+	}
+	return c
 }
 
 func (t *Table[T]) FullTableName() string {
@@ -222,12 +235,13 @@ func (t *Table[T]) NamedSelect(ctx context.Context, db DB, query string, args ..
 
 func (t *Table[T]) GetSelectableColumns(groupBy bool, names ...Column) []string {
 	var selectValues []string
+	selectableColumns := t.GetColumns()
 	if len(names) > 0 {
 		for _, name := range names {
 			if name.Name == "" {
 				continue
 			}
-			e, found := t.Columns[name.Name]
+			e, found := selectableColumns[name.Name]
 			if !found {
 				continue
 			}
@@ -239,7 +253,7 @@ func (t *Table[T]) GetSelectableColumns(groupBy bool, names ...Column) []string 
 		return selectValues
 	}
 
-	for _, e := range t.Columns {
+	for _, e := range selectableColumns {
 		if e.Select {
 			selectValues = append(selectValues, e.FullName(groupBy, true))
 		}
@@ -262,14 +276,15 @@ func (t *Table[T]) OrderByStatement(groupBy bool, orderBy ...string) string {
 	var orderByValues []string
 
 	var columns []Column
+	c := t.GetColumns()
 	for _, o := range orderBy {
-		if v, found := t.Columns[o]; found {
+		if v, found := c[o]; found {
 			columns = append(columns, v)
 			//orderByValues = append(orderByValues, v.GetOrderStmt())
 		}
 	}
 	if len(orderBy) == 0 {
-		for _, column := range t.Columns {
+		for _, column := range c {
 			if column.Order {
 				columns = append(columns, column)
 			}
@@ -356,7 +371,7 @@ func (t *Table[T]) GenerateID() map[string]string {
 func (t *Table[T]) InsertStatement(amount int) string {
 	var columnNames []string
 	var values []string
-	for _, e := range t.Columns {
+	for _, e := range t.GetColumns() {
 		if e.Skip {
 			continue
 		}
@@ -456,7 +471,7 @@ func (t *Table[T]) DeleteWithColumns(ctx context.Context, fullTableName string, 
 
 func (t *Table[T]) DeleteStatement() string {
 	var whereValues []string
-	for _, e := range t.Columns {
+	for _, e := range t.GetColumns() {
 		if e.Primary {
 			whereValues = append(whereValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
 			continue

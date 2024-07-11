@@ -1,6 +1,7 @@
 package QueryHelper
 
 import (
+	"context"
 	"fmt"
 	"github.com/google/uuid"
 	"testing"
@@ -22,6 +23,11 @@ func TestQuery_Build(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	table.InitializeTable(context.Background(), MockDB{
+		tables:   make(map[string]*mockTable),
+		mockData: make(map[string]map[string]*mockData),
+		prefix:   "qa_",
+	})
 	q := QueryTable[Resource](table)
 	q.Select(q.Column("id").Wrap("distinct %s").As("did"), q.Column("data"))
 	for _, permissions := range []string{"test_id", "test_id2"} {
