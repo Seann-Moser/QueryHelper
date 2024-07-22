@@ -102,7 +102,7 @@ func TestTableJoin2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	GuestRequestsTable.InitializeTable(context.Background(), MockDB{
+	_ = GuestRequestsTable.InitializeTable(context.Background(), MockDB{
 		tables:   make(map[string]*mockTable),
 		mockData: make(map[string]map[string]*mockData),
 		prefix:   "qa_",

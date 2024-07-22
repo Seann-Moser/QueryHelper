@@ -8,13 +8,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/Seann-Moser/ctx_cache"
+	"go.opentelemetry.io/otel"
 	"reflect"
 	"regexp"
 	"sort"
 	"strings"
-
-	"github.com/Seann-Moser/ctx_cache"
-	"go.opentelemetry.io/otel"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -634,7 +633,7 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 				return "", err
 			}
 			tmpArgs = AddPrefix(fmt.Sprintf("%d_", rowIndex), tmpArgs)
-			args, err = combineStructs(args, tmpArgs)
+			args, err = combineMaps(args, tmpArgs)
 			if err != nil {
 				return "", err
 			}
@@ -660,6 +659,51 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 	return "", err
 }
 
+type row[T any] struct {
+	index int
+	data  T
+}
+
+func (t *Table[T]) CombineRows(ctx context.Context, rows ...T) (map[string]interface{}, error) {
+	c := make(chan map[string]interface{})
+	rowI := make(chan row[T])
+	Workers := 1
+
+	go func() {
+		for rowIndex, i := range rows {
+			rowI <- row[T]{
+				index: rowIndex,
+				data:  i,
+			}
+		}
+		close(rowI)
+	}()
+	generateIds := t.GenerateID()
+	for i := 0; i < Workers; i++ {
+		go func() {
+			for r := range rowI {
+				tmpArgs, err := combineStructs(generateIds, r.data)
+				if err != nil {
+					continue
+				}
+				tmpArgs = AddPrefix(fmt.Sprintf("%d_", r.index), tmpArgs)
+				c <- tmpArgs
+			}
+			close(c)
+		}()
+	}
+	var err error
+	args := map[string]interface{}{}
+	for tmpArgs := range c {
+		args, err = combineMaps(args, tmpArgs)
+		if err != nil {
+			return nil, err
+		}
+
+	}
+	return args, nil
+}
+
 func (t *Table[T]) Upsert(ctx context.Context, db DB, s ...T) (string, error) {
 	if db == nil {
 		db = t.db
@@ -671,25 +715,16 @@ func (t *Table[T]) Upsert(ctx context.Context, db DB, s ...T) (string, error) {
 	ctx, span := tracer.Tracer("upsert").Start(ctx, t.FullTableName())
 	defer span.End()
 	if t.IsAutoGenerateID() {
-		generateIds := t.GenerateID()
-		args := map[string]interface{}{}
-		for rowIndex, i := range s {
-			tmpArgs, err := combineStructs(generateIds, i)
-			if err != nil {
-				return "", err
-			}
-			tmpArgs = AddPrefix(fmt.Sprintf("%d_", rowIndex), tmpArgs)
-			args, err = combineStructs(args, tmpArgs)
-			if err != nil {
-				return "", err
-			}
+		args, err := t.CombineRows(ctx, s...)
+		if err != nil {
+			return "", err
 		}
-		err := db.ExecContext(ctx, t.UpsertStatement(len(s)), args)
+		err = db.ExecContext(ctx, t.UpsertStatement(len(s)), args)
 		if err == nil {
 			span.RecordError(err)
 			_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
 		}
-		return generateIds[t.GetGenerateID()[0].Name], err
+		return "", err
 	}
 	args, err := combineStructsWithPrefix[T](s...)
 	if err != nil {

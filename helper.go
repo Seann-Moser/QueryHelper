@@ -3,8 +3,8 @@ package QueryHelper
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
+	json "github.com/goccy/go-json"
 	"go.opencensus.io/tag"
 	"reflect"
 	"strconv"
@@ -170,13 +170,30 @@ func combineStructs(i ...interface{}) (map[string]interface{}, error) {
 	return output, nil
 }
 
-func JoinMapsWithPrefix[T any](prefix string, m ...map[string]T) map[string]T {
-	output := map[string]T{}
-	for index, currentMap := range m {
-		for k, v := range currentMap {
-			if index == 0 {
+func combineMaps(mapList ...map[string]interface{}) (map[string]interface{}, error) {
+	output := map[string]interface{}{}
+	if mapList == nil || len(mapList) <= 1 {
+		return output, nil
+	}
+	output = mapList[0]
+	for i := 1; i < len(mapList); i++ {
+		for k, v := range mapList[i] {
+			if _, ok := output[k]; !ok {
 				output[k] = v
-			} else if _, found := output[prefix+k]; !found {
+			}
+		}
+	}
+	return output, nil
+}
+
+func JoinMapsWithPrefix[T any](prefix string, mapList ...map[string]T) map[string]T {
+	if len(mapList) <= 1 {
+		return mapList[0]
+	}
+	output := mapList[0]
+	for i := 1; i < len(mapList); i++ {
+		for k, v := range mapList[i] {
+			if _, found := output[k]; !found {
 				output[prefix+k] = v
 			}
 		}
@@ -193,10 +210,13 @@ func AddPrefix(prefix string, i map[string]interface{}) map[string]interface{} {
 	}
 	return output
 }
-func JoinMaps[T any](m ...map[string]T) map[string]T {
-	output := map[string]T{}
-	for _, currentMap := range m {
-		for k, v := range currentMap {
+func JoinMaps[T any](mapList ...map[string]T) map[string]T {
+	if len(mapList) <= 1 {
+		return mapList[0]
+	}
+	output := mapList[0]
+	for i := 1; i < len(mapList); i++ {
+		for k, v := range mapList[i] {
 			if _, found := output[k]; !found {
 				output[k] = v
 			}

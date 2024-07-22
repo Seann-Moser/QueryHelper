@@ -52,7 +52,7 @@ func (m MockDB) GetDataset(ds string) string {
 	if len(m.prefix) > 0 {
 		return m.prefix + ds
 	}
-	return fmt.Sprintf(ds)
+	return ds
 }
 
 type mockTable struct {
@@ -62,9 +62,9 @@ type mockTable struct {
 }
 
 type mockData struct {
-	name    string
-	dataset string
-	columns map[string]Column
+	//name    string
+	//dataset string
+	//columns map[string]Column
 }
 
 func NewMockDB() *MockDB {
