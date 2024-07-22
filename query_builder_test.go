@@ -23,7 +23,7 @@ func TestQuery_Build(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	table.InitializeTable(context.Background(), MockDB{
+	_ = table.InitializeTable(context.Background(), MockDB{
 		tables:   make(map[string]*mockTable),
 		mockData: make(map[string]map[string]*mockData),
 		prefix:   "qa_",

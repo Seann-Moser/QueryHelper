@@ -1,7 +1,7 @@
 package QueryHelper
 
 import (
-	"encoding/json"
+	json "github.com/goccy/go-json"
 	"reflect"
 	"strconv"
 	"strings"
