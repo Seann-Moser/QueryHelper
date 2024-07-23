@@ -3,8 +3,8 @@ package QueryHelper
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
-	json "github.com/goccy/go-json"
 	"go.opencensus.io/tag"
 	"reflect"
 	"strconv"
