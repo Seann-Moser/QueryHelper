@@ -3,9 +3,8 @@ module github.com/Seann-Moser/QueryHelper
 go 1.21.4
 
 require (
-	github.com/Seann-Moser/ctx_cache v1.0.23
-	github.com/Seann-Moser/go-serve v0.9.2
-	github.com/goccy/go-json v0.10.3
+	github.com/Seann-Moser/ctx_cache v1.0.26
+	github.com/Seann-Moser/go-serve v0.9.3
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/spf13/pflag v1.0.5
@@ -21,6 +20,7 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
