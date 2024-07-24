@@ -717,6 +717,9 @@ func (t *Table[T]) Upsert(ctx context.Context, db DB, s ...T) (string, error) {
 	tracer := otel.GetTracerProvider()
 	ctx, span := tracer.Tracer("upsert").Start(ctx, t.FullTableName())
 	defer span.End()
+	if len(s) == 0 {
+		return "", nil
+	}
 	if t.IsAutoGenerateID() {
 		args, err := t.CombineRows(ctx, s...)
 		if err != nil {
