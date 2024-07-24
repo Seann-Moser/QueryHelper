@@ -2,10 +2,10 @@ cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMT
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
 filippo.io/edwards25519 v1.1.0/go.mod h1:BxyFTGdWcka3PhytdK4V28tE5sGfRvvvRV7EaN4VDT4=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/Seann-Moser/ctx_cache v1.0.26 h1:7yaeeKGBcHJp0wQ6aFuYnBou7SQDT6zgmYNoIa5gW1A=
-github.com/Seann-Moser/ctx_cache v1.0.26/go.mod h1:y2MCngphq901YX2IlZAJsXL/ie/v4ODdZynzHQVRF0c=
-github.com/Seann-Moser/go-serve v0.9.3 h1:SZof+GrLEauqGLbCFrOgpzlqT++lSuJe/kI2HnLMcFQ=
-github.com/Seann-Moser/go-serve v0.9.3/go.mod h1:KAeB+8bdMw6SidYZFdG4vWXXcRQ/VT4VCdjU5EHzV+s=
+github.com/Seann-Moser/ctx_cache v1.0.27 h1:xvPrCMqu6Tk5LVrTTP5qBaznz5dnuw2p8qIdlfNo6bM=
+github.com/Seann-Moser/ctx_cache v1.0.27/go.mod h1:y2MCngphq901YX2IlZAJsXL/ie/v4ODdZynzHQVRF0c=
+github.com/Seann-Moser/go-serve v0.9.5 h1:BavleVEjXJYP3t7lg9OLFVuDcsexU8HJ+76RS4xPrMA=
+github.com/Seann-Moser/go-serve v0.9.5/go.mod h1:Eim+tPfzJ3IT08oP15PfC++XMEPH/RmSIDMJalVUB3Q=
 github.com/Seann-Moser/ociredis v1.0.0 h1:ROjrpav9LP/lIuoRTE8QtexWX0FW6okyDhRb+mAb8nk=
 github.com/Seann-Moser/ociredis v1.0.0/go.mod h1:sXC0hfTeNvnEWFzau9CD39uQkizB4q3PBZHVagY2uEs=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
