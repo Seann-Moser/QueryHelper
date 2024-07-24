@@ -101,8 +101,11 @@ func ToSnakeCase(str string) string {
 	return strings.ToLower(snake)
 }
 
-func (t *Table[T]) GetDB() DB {
-	return t.db
+func (t *Table[T]) GetDB() (DB, error) {
+	if t.db == nil {
+		return nil, fmt.Errorf("no db set")
+	}
+	return t.db, nil
 }
 
 func (t *Table[T]) GetPrimary() []Column {
