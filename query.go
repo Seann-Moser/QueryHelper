@@ -525,6 +525,31 @@ func SelectQuery[T any, X any](ctx context.Context, db DB, q *Query[T], args ...
 	if db == nil {
 		db = q.FromTable.db
 	}
+	if q.useCache {
+		cacheKey := q.GetCacheKey(args...)
+		tracer := otel.GetTracerProvider()
+		ctx, span := tracer.Tracer("select-query-ctx").Start(ctx, fmt.Sprintf("%s-%s", q.Name, q.FromTable.FullTableName()))
+		defer span.End()
+		return ctx_cache.GetSet[[]*X](ctx, q.CacheDuration, q.FromTable.FullTableName(), cacheKey, func(ctx context.Context) ([]*X, error) {
+			rows, err := NamedQuery(ctx, db, q.Query, q.Args(args...))
+			if err != nil {
+				return nil, err
+			}
+			if rows == nil {
+				return nil, sql.ErrNoRows
+			}
+			var output []*X
+			for rows.Next() {
+				var tmp X
+				err := rows.StructScan(&tmp)
+				if err != nil {
+					return nil, err
+				}
+				output = append(output, &tmp)
+			}
+			return output, nil
+		})
+	}
 	rows, err := NamedQuery(ctx, db, q.Query, q.Args(args...))
 	if err != nil {
 		return nil, err
