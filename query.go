@@ -546,7 +546,7 @@ func (q *Query[T]) TotalRows(ctx context.Context, distintColumns *Column) (int, 
 		ctx, span := tracer.Tracer("query-ctx").Start(ctx, fmt.Sprintf("%s-%s", q.Name, q.FromTable.FullTableName()))
 		defer span.End()
 		return ctx_cache.GetSet[int](ctx, q.CacheDuration, q.FromTable.FullTableName(), cacheKey, func(ctx context.Context) (int, error) {
-			db, err := q.FromTable.NamedQuery(ctx, nil, query)
+			db, err := q.FromTable.NamedQuery(ctx, nil, query, q.Args())
 			if err != nil {
 				return -1, err
 			}
@@ -560,7 +560,7 @@ func (q *Query[T]) TotalRows(ctx context.Context, distintColumns *Column) (int, 
 			return t.Total, nil
 		})
 	}
-	db, err := q.FromTable.NamedQuery(ctx, nil, query)
+	db, err := q.FromTable.NamedQuery(ctx, nil, query, q.Args())
 	if err != nil {
 		return -1, err
 	}
