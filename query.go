@@ -619,7 +619,7 @@ func (q *Query[T]) buildSqlQuery() *Query[T] {
 	}
 
 	if q.Pagination.Limit > 0 {
-		query = fmt.Sprintf("%s\nLIMIT %d OFFSET %d;", query, q.Pagination.Offset, q.Pagination.Offset)
+		query = fmt.Sprintf("%s\nLIMIT %d OFFSET %d;", query, q.Pagination.Limit, q.Pagination.Offset)
 	}
 	q.Query = query
 	return q
