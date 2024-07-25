@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -249,6 +250,36 @@ func (q *Query[T]) Where(column Column, conditional, joinOperator string, level 
 	return q
 }
 
+func (q *Query[T]) W(column Column, conditional string, value interface{}) *Query[T] {
+	if column.Name == "" {
+		return q
+	}
+	q.WhereStmts = append(q.WhereStmts, &WhereStmt{
+		LeftValue:    column,
+		Conditional:  conditional,
+		RightValue:   value,
+		Level:        0,
+		JoinOperator: "AND",
+	})
+
+	return q
+}
+
+func (q *Query[T]) Page(limit int, offset int) *Query[T] {
+	q.Pagination.Limit = limit
+	q.Pagination.Offset = offset
+	return q
+}
+
+func (q *Query[T]) SetPageFromRequest(currentPage uint, itemsPerPage uint) *Query[T] {
+	if currentPage < 1 {
+		currentPage = 1
+	}
+	q.Pagination.Limit = int(itemsPerPage)
+	q.Pagination.Offset = int(currentPage-1) * int(itemsPerPage)
+	return q
+}
+
 func (q *Query[T]) GroupBy(column ...Column) *Query[T] {
 	for _, c := range column {
 		if c.Name == "" {
@@ -458,7 +489,8 @@ func (q *Query[T]) GetCacheKey(args ...interface{}) string {
 	for _, k := range q.OrderByStmt {
 		keys = append(keys, k.FullTableName())
 	}
-
+	keys = append(keys, strconv.Itoa(q.Pagination.Offset))
+	keys = append(keys, strconv.Itoa(q.Pagination.Limit))
 	for k, v := range argsData {
 		keys = append(keys, fmt.Sprintf("%s:%s", k, safeString(v)))
 	}
@@ -469,6 +501,77 @@ func (q *Query[T]) GetCacheKey(args ...interface{}) string {
 func GetMD5Hash(text string) string {
 	hash := md5.Sum([]byte(text))
 	return hex.EncodeToString(hash[:])
+}
+
+type TotalRows struct {
+	Total int `json:"total" db:"total"`
+}
+
+func (q *Query[T]) TotalRows(ctx context.Context, distintColumns *Column) (int, error) {
+	var query string
+	if q.err != nil {
+		return -1, q.err
+	}
+	if distintColumns == nil {
+		query = fmt.Sprintf("SELECT\n\tcount(*) as total\nFROM\n\t%s", q.FromTable.FullTableName())
+	} else {
+		query = fmt.Sprintf("SELECT\n\tcount(%s) as total\nFROM\n\t%s", distintColumns.FullName(false, false), q.FromTable.FullTableName())
+	}
+
+	if len(q.JoinStmt) > 0 {
+		for _, join := range q.JoinStmt {
+			overlappingColumns := map[string]Column{}
+			overlappingColumns = JoinMaps[Column](overlappingColumns, q.FromTable.GetCommonColumns(join.Columns))
+			if len(overlappingColumns) == 0 {
+				continue
+			}
+			query = fmt.Sprintf("%s\n%s", query, q.FromTable.generateJoinStmt(overlappingColumns, join.JoinType))
+		}
+	}
+
+	if len(q.WhereStmts) > 0 {
+		query = fmt.Sprintf("%s\n%s", query, generateWhere(q.WhereStmts))
+	}
+
+	if len(q.GroupByStmt) > 0 {
+		query = fmt.Sprintf("%s\n%s", query, generateGroupBy(q.GroupByStmt))
+	}
+
+	if len(q.OrderByStmt) > 0 {
+		query = fmt.Sprintf("%s\n%s", query, q.FromTable.OrderByColumns(len(q.GroupByStmt) > 0, q.OrderByStmt...))
+	}
+	cacheKey := q.GetCacheKey() + "_total"
+	if q.useCache {
+		tracer := otel.GetTracerProvider()
+		ctx, span := tracer.Tracer("query-ctx").Start(ctx, fmt.Sprintf("%s-%s", q.Name, q.FromTable.FullTableName()))
+		defer span.End()
+		return ctx_cache.GetSet[int](ctx, q.CacheDuration, q.FromTable.FullTableName(), cacheKey, func(ctx context.Context) (int, error) {
+			db, err := q.FromTable.NamedQuery(ctx, nil, query)
+			if err != nil {
+				return -1, err
+			}
+			t := TotalRows{}
+			if db.Next() {
+				err = db.StructScan(&t)
+				if err != nil {
+					return -1, err
+				}
+			}
+			return t.Total, nil
+		})
+	}
+	db, err := q.FromTable.NamedQuery(ctx, nil, query)
+	if err != nil {
+		return -1, err
+	}
+	t := TotalRows{}
+	if db.Next() {
+		err = db.StructScan(&t)
+		if err != nil {
+			return -1, err
+		}
+	}
+	return t.Total, nil
 }
 
 func (q *Query[T]) buildSqlQuery() *Query[T] {
@@ -511,8 +614,12 @@ func (q *Query[T]) buildSqlQuery() *Query[T] {
 		query = fmt.Sprintf("%s\n%s", query, q.FromTable.OrderByColumns(len(q.GroupByStmt) > 0, q.OrderByStmt...))
 	}
 
-	if q.LimitCount > 0 {
+	if q.LimitCount > 0 && q.Pagination.Limit == 0 {
 		query = fmt.Sprintf("%s\nLIMIT %d;", query, q.LimitCount)
+	}
+
+	if q.Pagination.Limit > 0 {
+		query = fmt.Sprintf("%s\nLIMIT %d OFFSET %d;", query, q.Pagination.Offset, q.Pagination.Offset)
 	}
 	q.Query = query
 	return q
