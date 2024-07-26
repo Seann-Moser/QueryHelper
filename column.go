@@ -40,11 +40,17 @@ type Column struct {
 
 	AutoGenerateIDType string `json:"auto_generate_id_type"`
 	Wrapper            string `json:"wrapper"`
+	ignoreGroupBy      bool
 	SelectAs           string `json:"as"`
 }
 
 func (c Column) Wrap(wrap string) Column {
 	c.Wrapper = wrap
+	return c
+}
+
+func (c Column) IgnoreGroupBy() Column {
+	c.ignoreGroupBy = true
 	return c
 }
 
@@ -88,7 +94,7 @@ func (c *Column) FullName(groupBy bool, inSelect bool) string {
 		name = fmt.Sprintf(c.Wrapper, name)
 	}
 
-	if groupBy && len(c.GroupByModifier) > 0 {
+	if groupBy && len(c.GroupByModifier) > 0 && !c.ignoreGroupBy {
 		if strings.Contains(c.GroupByModifier, "*") {
 			name = strings.ReplaceAll(c.GroupByModifier, "*", name)
 		} else {
