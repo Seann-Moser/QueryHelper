@@ -67,6 +67,9 @@ func NewTable[T any](databaseName string, queryType QueryType) (*Table[T], error
 		}
 
 		if value := field.Tag.Get(TagConfigPrefix); value != "" {
+			if value == "-" {
+				continue
+			}
 			column, err = GetColumnFromTag(name, value, field.Type)
 		} else {
 			column, err = GetColumnFromTag(name, "", field.Type)
@@ -84,7 +87,7 @@ func NewTable[T any](databaseName string, queryType QueryType) (*Table[T], error
 		if column.Primary {
 			setPrimary = true
 		}
-		if column.Name == "-" {
+		if column.Name == "-" || column.Ignore {
 			continue
 		}
 		newTable.Columns[column.Name] = *column
@@ -459,7 +462,7 @@ func DeleteStatement(fullTableName string, columns map[string]Column) string {
 
 func (t *Table[T]) DeleteWithColumns(ctx context.Context, fullTableName string, columns map[string]Column, s T) error {
 	if t.db == nil {
-		return nil
+		return fmt.Errorf("failed deleting row, db is nil")
 	}
 	if c := t.GetCommonColumns(columns); len(c) == 0 {
 		return nil
@@ -468,7 +471,13 @@ func (t *Table[T]) DeleteWithColumns(ctx context.Context, fullTableName string, 
 	ctx, span := tracer.Tracer("delete-w-column").Start(ctx, t.FullTableName())
 	defer span.End()
 	//tableUpdateSignal <- t.FullTableName()
-	return t.db.ExecContext(ctx, DeleteStatement(fullTableName, columns), s)
+
+	err := t.db.ExecContext(ctx, DeleteStatement(fullTableName, columns), s)
+	if err != nil {
+		return err
+	}
+	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+	return nil
 }
 
 func (t *Table[T]) DeleteStatement() string {

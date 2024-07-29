@@ -42,6 +42,7 @@ type Column struct {
 	Wrapper            string `json:"wrapper"`
 	ignoreGroupBy      bool
 	SelectAs           string `json:"as"`
+	Ignore             bool   `json:"ignore"`
 }
 
 func (c Column) Wrap(wrap string) Column {
