@@ -84,6 +84,7 @@ type Query[T any] struct {
 
 	Cache         ctx_cache.Cache
 	useCache      bool
+	refreshCache  bool
 	Query         string
 	skipCache     bool
 	CacheDuration time.Duration
@@ -324,8 +325,14 @@ func (q *Query[T]) SetCache(cache ctx_cache.Cache) *Query[T] {
 	q.Cache = cache
 	return q
 }
+
 func (q *Query[T]) UseCache() *Query[T] {
 	q.useCache = true
+	return q
+}
+
+func (q *Query[T]) Refresh(refresh bool) *Query[T] {
+	q.refreshCache = refresh
 	return q
 }
 
@@ -439,6 +446,14 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 		tracer := otel.GetTracerProvider()
 		ctx, span := tracer.Tracer("query-ctx").Start(ctx, fmt.Sprintf("%s-%s", q.Name, q.FromTable.FullTableName()))
 		defer span.End()
+		if q.refreshCache {
+			data, err := q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
+			if err != nil {
+				return nil, err
+			}
+			_ = ctx_cache.Set[[]*T](ctx, q.FromTable.FullTableName(), cacheKey, data)
+			return data, nil
+		}
 		return ctx_cache.GetSet[[]*T](ctx, q.CacheDuration, q.FromTable.FullTableName(), cacheKey, func(ctx context.Context) ([]*T, error) {
 			return q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
 		})
@@ -637,6 +652,28 @@ func SelectQuery[T any, X any](ctx context.Context, db DB, q *Query[T], args ...
 		tracer := otel.GetTracerProvider()
 		ctx, span := tracer.Tracer("select-query-ctx").Start(ctx, fmt.Sprintf("%s-%s", q.Name, q.FromTable.FullTableName()))
 		defer span.End()
+		if q.refreshCache {
+			rows, err := NamedQuery(ctx, db, q.Query, q.Args(args...))
+			if err != nil {
+				return nil, err
+			}
+			if rows == nil {
+				return nil, sql.ErrNoRows
+			}
+			var output []*X
+			for rows.Next() {
+				var tmp X
+				err := rows.StructScan(&tmp)
+				if err != nil {
+					return nil, err
+				}
+				output = append(output, &tmp)
+			}
+			_ = ctx_cache.Set[[]*X](ctx, q.FromTable.FullTableName(), cacheKey, output)
+			return output, nil
+
+		}
+
 		return ctx_cache.GetSet[[]*X](ctx, q.CacheDuration, q.FromTable.FullTableName(), cacheKey, func(ctx context.Context) ([]*X, error) {
 			rows, err := NamedQuery(ctx, db, q.Query, q.Args(args...))
 			if err != nil {
