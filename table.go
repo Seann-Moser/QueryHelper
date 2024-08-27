@@ -465,7 +465,7 @@ func (t *Table[T]) DeleteWithColumns(ctx context.Context, fullTableName string, 
 		return fmt.Errorf("failed deleting row, db is nil")
 	}
 	if c := t.GetCommonColumns(columns); len(c) == 0 {
-		return nil
+		return fmt.Errorf("no common columns")
 	}
 	tracer := otel.GetTracerProvider()
 	ctx, span := tracer.Tracer("delete-w-column").Start(ctx, t.FullTableName())
