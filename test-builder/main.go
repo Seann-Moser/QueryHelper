@@ -21,8 +21,6 @@ func main() {
 
 	for _, file := range files {
 		println(file)
-		if strings.Contains(file, "test") {
-		}
 		content, err := readFile(file)
 		if err != nil {
 			fmt.Printf("Error reading file: %v\n", err)
@@ -116,10 +114,7 @@ func GenerateTestBlocks(file string, codeBlocks ...string) ([]string, error) {
 		}
 
 		b = fmt.Sprintf(testBlock, name, i+1, name, strings.Join(init, "\n"), block)
-		unused, err := FindUnusedVariables(b)
-		if err != nil {
-
-		}
+		unused, _ := FindUnusedVariables(b)
 		println(strings.Join(unused, ""))
 		testBlocks = append(testBlocks, b)
 	}
@@ -191,18 +186,6 @@ func FindUndeclaredVariables(code string) ([]string, error) {
 	}
 
 	return undeclaredVars, nil
-}
-
-// isVariable checks if an identifier is used as a variable, not as a function or type.
-func isVariable(id *ast.Ident) bool {
-	// Skip identifiers that are package names or function names
-	if obj := id.Obj; obj != nil {
-		switch obj.Kind {
-		case ast.Var, ast.Con:
-			return true
-		}
-	}
-	return false
 }
 
 // FindAllVariables analyzes Go code and returns a list of all variable names.
