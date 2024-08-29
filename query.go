@@ -153,6 +153,7 @@ func QueryTable[T any](table *Table[T]) *Query[T] {
 		Cache:                 nil,
 		Query:                 "",
 		skipCache:             false,
+		cansave:               true,
 	}
 }
 
@@ -184,7 +185,7 @@ func (q *Query[T]) hasSaved() bool {
 }
 
 func (q *Query[T]) canSave() bool {
-	if q.Name == "" && q.cansave {
+	if q.Name == "" && !q.cansave {
 		return false
 	}
 	_, f := QueryPrepare[q.Name]
