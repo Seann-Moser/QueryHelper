@@ -91,8 +91,8 @@ type Query[T any] struct {
 	skipCache     bool
 	CacheDuration time.Duration
 	WhereColumns  map[string]int
-
-	Pagination struct {
+	cansave       bool
+	Pagination    struct {
 		Limit              int
 		Offset             int
 		PreviousPageColumn Column
@@ -182,6 +182,15 @@ func (q *Query[T]) hasSaved() bool {
 	_, f := QueryPrepare[q.Name]
 	return f
 }
+
+func (q *Query[T]) canSave() bool {
+	if q.Name == "" && q.cansave {
+		return false
+	}
+	_, f := QueryPrepare[q.Name]
+	return f
+}
+
 func (q *Query[T]) Column(name string) Column {
 	if q.err != nil {
 		return Column{}
@@ -226,6 +235,9 @@ func (q *Query[T]) UniqueWhere(column Column, conditional, joinOperator string, 
 	if column.Name == "" {
 		return q
 	}
+	if strings.Contains(conditional, "in") {
+		q.cansave = false
+	}
 	stmt := &WhereStmt{
 		LeftValue:    column,
 		Conditional:  conditional,
@@ -247,6 +259,9 @@ func (q *Query[T]) UniqueWhere(column Column, conditional, joinOperator string, 
 func (q *Query[T]) Where(column Column, conditional, joinOperator string, level int, value interface{}) *Query[T] {
 	if level < 0 {
 		level = 0
+	}
+	if strings.Contains(conditional, "in") {
+		q.cansave = false
 	}
 	if q.hasSaved() {
 		return q
@@ -272,6 +287,9 @@ func (q *Query[T]) W(column Column, conditional string, value interface{}) *Quer
 	}
 	if q.hasSaved() {
 		return q
+	}
+	if strings.Contains(conditional, "in") {
+		q.cansave = false
 	}
 	q.WhereStmts = append(q.WhereStmts, &WhereStmt{
 		LeftValue:    column,
@@ -604,7 +622,7 @@ func (q *Query[T]) buildSqlQuery() *Query[T] {
 	if q.err != nil {
 		return q
 	}
-	if q.Name != "" {
+	if q.hasSaved() {
 		if v, found := QueryPrepare[q.Name]; found {
 			q.Query = v
 			return q
@@ -654,7 +672,7 @@ func (q *Query[T]) buildSqlQuery() *Query[T] {
 		query = fmt.Sprintf("%s\nLIMIT %d OFFSET %d;", query, q.Pagination.Limit, q.Pagination.Offset)
 	}
 	q.Query = query
-	if q.Name != "" {
+	if q.canSave() {
 		QueryPrepare[q.Name] = query
 	}
 	return q
