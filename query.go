@@ -15,6 +15,8 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
+var QueryPrepare = map[string]string{}
+
 //type CacheMonitor struct {
 //	TableCache map[string]map[string]string
 //	Cache      ctx_cache.Cache
@@ -173,9 +175,18 @@ func (q *Query[T]) From(query *Query[T]) *Query[T] {
 	q.FromQuery = query
 	return q
 }
-
+func (q *Query[T]) hasSaved() bool {
+	if q.Name == "" {
+		return false
+	}
+	_, f := QueryPrepare[q.Name]
+	return f
+}
 func (q *Query[T]) Column(name string) Column {
 	if q.err != nil {
+		return Column{}
+	}
+	if q.hasSaved() {
 		return Column{}
 	}
 	c := q.FromTable.GetColumn(name)
@@ -237,9 +248,13 @@ func (q *Query[T]) Where(column Column, conditional, joinOperator string, level 
 	if level < 0 {
 		level = 0
 	}
+	if q.hasSaved() {
+		return q
+	}
 	if column.Name == "" {
 		return q
 	}
+
 	q.WhereStmts = append(q.WhereStmts, &WhereStmt{
 		LeftValue:    column,
 		Conditional:  conditional,
@@ -253,6 +268,9 @@ func (q *Query[T]) Where(column Column, conditional, joinOperator string, level 
 
 func (q *Query[T]) W(column Column, conditional string, value interface{}) *Query[T] {
 	if column.Name == "" {
+		return q
+	}
+	if q.hasSaved() {
 		return q
 	}
 	q.WhereStmts = append(q.WhereStmts, &WhereStmt{
@@ -342,6 +360,7 @@ func (q *Query[T]) Build() *Query[T] {
 	case QueryTypeSQL:
 		fallthrough
 	default:
+
 		query := q.buildSqlQuery()
 		return query
 	}
@@ -430,9 +449,9 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 	if len(q.Query) == 0 {
 		q.Build()
 	}
-	if q.Name != "" {
-		_ = ctx_cache.SetWithExpiration[string](ctx, 30*time.Minute, "queries", q.Name, q.Query)
-	}
+	//if q.Name != "" {
+	//	_ = ctx_cache.SetWithExpiration[string](ctx, 30*time.Minute, "queries", q.Name, q.Query)
+	//}
 	ctx = CtxWithQueryTag(ctx, q.getName())
 	cacheKey := q.GetCacheKey(args...)
 
@@ -585,6 +604,12 @@ func (q *Query[T]) buildSqlQuery() *Query[T] {
 	if q.err != nil {
 		return q
 	}
+	if q.Name != "" {
+		if v, found := QueryPrepare[q.Name]; found {
+			q.Query = v
+			return q
+		}
+	}
 	var isGroupBy = len(q.GroupByStmt) > 0
 	var query string
 	selectColumns := q.FromTable.GetSelectableColumns(isGroupBy, q.SelectColumns...)
@@ -629,6 +654,9 @@ func (q *Query[T]) buildSqlQuery() *Query[T] {
 		query = fmt.Sprintf("%s\nLIMIT %d OFFSET %d;", query, q.Pagination.Limit, q.Pagination.Offset)
 	}
 	q.Query = query
+	if q.Name != "" {
+		QueryPrepare[q.Name] = query
+	}
 	return q
 }
 

@@ -81,34 +81,47 @@ func (w *WhereStmt) ToString() string {
 }
 
 func generateWhere(whereStatements []*WhereStmt) string {
+	var builder strings.Builder
+	builder.WriteString("WHERE ")
+
 	previousLevel := 0
-	stmt := ""
+
 	for i, w := range whereStatements {
 		if where := w.ToString(); where != "" {
-
+			// Handle level changes
 			if w.Level < previousLevel {
-				stmt += fmt.Sprintf(" %s", generateList(")", previousLevel-w.Level))
+				for j := 0; j < previousLevel-w.Level; j++ {
+					builder.WriteString(")")
+				}
 			}
+
 			if i > 0 {
 				if w.JoinOperator == "" {
 					w.JoinOperator = "AND"
 				}
-				stmt += " " + strings.ToUpper(w.JoinOperator)
+				builder.WriteString(" ")
+				builder.WriteString(strings.ToUpper(w.JoinOperator))
 			}
 
 			if w.Level > previousLevel {
-				stmt += fmt.Sprintf(" %s", generateList("(", w.Level-previousLevel))
+				for j := 0; j < w.Level-previousLevel; j++ {
+					builder.WriteString("(")
+				}
 			}
 
-			stmt += fmt.Sprintf(" %s", w.ToString())
+			builder.WriteString(" ")
+			builder.WriteString(where)
 			previousLevel = w.Level
-
 		}
 	}
+
 	if previousLevel > 0 {
-		stmt += fmt.Sprintf(" %s", generateList(")", previousLevel))
+		for j := 0; j < previousLevel; j++ {
+			builder.WriteString(")")
+		}
 	}
-	return "WHERE " + stmt
+
+	return builder.String()
 }
 
 func generateList(symbol string, count int) string {
