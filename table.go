@@ -665,6 +665,7 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 		db = t.db
 	}
 	if db == nil {
+		_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
 		return "", nil
 	}
 	tracer := otel.GetTracerProvider()
