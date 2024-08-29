@@ -14,7 +14,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -40,13 +39,11 @@ var (
 )
 
 type Table[T any] struct {
-	Dataset      string            `json:"dataset"`
-	Name         string            `json:"name"`
-	Columns      map[string]Column `json:"columns"`
-	QueryType    QueryType         `json:"query_type"`
-	db           DB
-	ColumnName   []string `json:"column_name"`
-	ColumnValues []string `json:"column_values"`
+	Dataset   string            `json:"dataset"`
+	Name      string            `json:"name"`
+	Columns   map[string]Column `json:"columns"`
+	QueryType QueryType         `json:"query_type"`
+	db        DB
 }
 
 func NewTable[T any](databaseName string, queryType QueryType) (*Table[T], error) {
@@ -98,13 +95,6 @@ func NewTable[T any](databaseName string, queryType QueryType) (*Table[T], error
 	if !setPrimary {
 		return nil, MissingPrimaryKeyErr
 	}
-	for _, e := range newTable.GetColumns() {
-		if e.Skip {
-			continue
-		}
-		newTable.ColumnName = append(newTable.ColumnName, e.Name)
-		newTable.ColumnValues = append(newTable.ColumnValues, e.Name)
-	}
 	return &newTable, nil
 }
 
@@ -155,16 +145,16 @@ func (t *Table[T]) InitializeTable(ctx context.Context, db DB, suffix ...string)
 }
 
 func (t *Table[T]) GetColumns() map[string]Column {
+	c := map[string]Column{}
 	if t.db == nil {
 		return t.Columns
 	}
-	c := make(map[string]Column, len(t.Columns))
 	for k, v := range t.Columns {
 		ts := v
 		ts.Dataset = t.db.GetDataset(t.Dataset)
 		c[k] = ts
 	}
-	return t.Columns
+	return c
 }
 
 func (t *Table[T]) FullTableName() string {
@@ -384,57 +374,33 @@ func (t *Table[T]) GenerateID() map[string]string {
 }
 
 func (t *Table[T]) InsertStatement(amount int) string {
-	if len(t.ColumnName) == 0 {
+	var columnNames []string
+	var values []string
+	for _, e := range t.GetColumns() {
+		if e.Skip {
+			continue
+		}
+		columnNames = append(columnNames, e.Name)
+		values = append(values, e.Name)
+	}
+	if len(columnNames) == 0 {
 		return ""
 	}
-
-	rows := make([]string, amount)
-	var wg sync.WaitGroup
-	rowChan := make(chan string, amount)
-
-	// Function to create a row
-	createRow := func(index int) {
-		defer wg.Done()
-		r := "(" + ArrayWithPrefixJoin(fmt.Sprintf(":%d_", index), t.ColumnName) + ")"
-		rowChan <- r
-	}
-
-	// Start goroutines to generate rows
+	var rows []string
 	for i := 0; i < amount; i++ {
-		wg.Add(1)
-		go createRow(i)
-	}
-	var insert string
-	// Wait for all goroutines to finish and collect results
-	go func() {
-		insert = fmt.Sprintf("INSERT INTO %s(%s) VALUES \n",
-			t.FullTableName(),
-			strings.Join(t.ColumnName, ","))
-		wg.Wait()
-		close(rowChan)
-	}()
-	var c = 0
-	for r := range rowChan {
-		rows[0] = r
-		c++
+		rows = append(rows, fmt.Sprintf("(%s)", strings.Join(ArrayWithPrefix(fmt.Sprintf(":%d_", i), values), ",")))
 	}
 
-	insert += strings.Join(rows, ",\n") + ";"
+	insert := fmt.Sprintf("INSERT INTO %s(%s) VALUES \n%s;",
+		t.FullTableName(),
+		strings.Join(columnNames, ","), strings.Join(rows, ",\n"))
 	return insert
 }
 
-func ArrayWithPrefixJoin(prefix string, list []string) string {
-	//rows := make([]string, len(list))
-	v := ""
-	for _, i := range list {
-		v += prefix + i + ","
-	}
-	return v[0 : len(v)-1]
-}
 func ArrayWithPrefix(prefix string, list []string) []string {
-	rows := make([]string, len(list))
-	for index, i := range list {
-		rows[index] = prefix + i
+	var rows []string
+	for _, i := range list {
+		rows = append(rows, fmt.Sprintf("%s%s", prefix, i))
 	}
 	return rows
 }
@@ -665,7 +631,6 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 		db = t.db
 	}
 	if db == nil {
-		_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
 		return "", nil
 	}
 	tracer := otel.GetTracerProvider()
