@@ -459,12 +459,6 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 	if q.err != nil {
 		return nil, q.err
 	}
-	if q.Name != "" {
-		query, err := ctx_cache.Get[string](ctx, "queries", q.Name)
-		if err == nil && *query != "" {
-			q.Query = *query
-		}
-	}
 	if len(q.Query) == 0 {
 		q.Build()
 	}
