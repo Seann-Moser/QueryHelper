@@ -94,6 +94,87 @@ func TestQuery_BuildGroupBy(t *testing.T) {
 	//println(args)
 }
 
+func BenchmarkQueryConstruction(b *testing.B) {
+	// Initialize the query builder
+
+	answerTable, err := NewTable[Answer]("test", QueryTypeSQL)
+	if err != nil {
+		b.Fatal(err)
+	}
+	// Define the parameters for the query
+	//column := "uid"
+	//surveyID := 0
+	//testID := "test_id"
+
+	// Run the benchmark
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		qt := QueryTable[Answer](answerTable)
+		qt.SetName("test-anwser")
+		qt.Select(qt.Column("uid").Wrap("count(distinct %s)").As("id"))
+		qt.Where(qt.Column("survey_id"), "=", "AND", 0, "test_id")
+		qt.Build()
+	}
+	b.StopTimer()
+}
+
+func BenchmarkQuery_Upsert(b *testing.B) {
+	// Setup the benchmark
+	answerTable, err := NewTable[Answer]("test", QueryTypeSQL)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	// Run the benchmark
+	for i := 0; i < b.N; i++ {
+		upsert := answerTable.UpsertStatement(10)
+		// Optionally, print the upsert statement for debugging:
+		// fmt.Println(upsert)
+		_ = upsert // To avoid compiler optimization of unused variable
+	}
+}
+
+func BenchmarkQuery_Insert(b *testing.B) {
+	// Setup the benchmark
+	answerTable, err := NewTable[Answer]("test", QueryTypeSQL)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	// Run the benchmark
+	/// 219526
+	//  302766
+	// 	156487
+	//  1165194
+	// 	 46275
+	//   33518
+	//  533104
+	for i := 0; i < b.N; i++ {
+		upsert := answerTable.InsertStatement(200)
+		// Optionally, print the upsert statement for debugging:
+		// fmt.Println(upsert)
+		_ = upsert // To avoid compiler optimization of unused variable
+	}
+}
+
+func BenchmarkQuery_Update(b *testing.B) {
+	// Setup the benchmark
+	answerTable, err := NewTable[Answer]("test", QueryTypeSQL)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	// Run the benchmark
+	for i := 0; i < b.N; i++ {
+		upsert := answerTable.UpdateStatement()
+		// Optionally, print the upsert statement for debugging:
+		// fmt.Println(upsert)
+		_ = upsert // To avoid compiler optimization of unused variable
+	}
+}
+
 func TestQuery_Upsert(t *testing.T) {
 	answerTable, err := NewTable[Answer]("test", QueryTypeSQL)
 	if err != nil {
@@ -109,6 +190,22 @@ var table = []struct {
 }{
 	{input: 1},
 	{input: 100},
+}
+
+func BenchmarkGenQuery(b *testing.B) {
+	for _, v := range table {
+		anwers := make([]Answer, v.input)
+		var output []interface{}
+		for _, a := range anwers {
+			a.UID = uuid.New().String()
+			a.QuestionID = uuid.New().String()
+			output = append(output, a)
+		}
+		b.Run(fmt.Sprintf("combining data_%d", v.input), func(b *testing.B) {
+			_, _ = combineStructs(output...)
+		})
+	}
+
 }
 
 func BenchmarkCombineStructs(b *testing.B) {
