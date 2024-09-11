@@ -242,3 +242,19 @@ func TestQuery_GroupBy(t *testing.T) {
 	println(auditQuery.Query)
 
 }
+
+func TestTable_Prefix(t *testing.T) {
+	auditTable, err := NewTable[AuditLog]("audit_log", QueryTypeSQL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	print(auditTable.tmpPrefix)
+
+	if auditTable.Prefix("hello").tmpPrefix != "hello" {
+		t.Fatal("prefix failed")
+	}
+	if auditTable.tmpPrefix != "" {
+		t.Fatal("prefix failed")
+	}
+
+}

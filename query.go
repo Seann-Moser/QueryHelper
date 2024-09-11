@@ -98,6 +98,8 @@ type Query[T any] struct {
 		PreviousPageColumn Column
 		PreviewColumnValue interface{}
 	}
+
+	tmpPrefix string
 }
 
 type JoinStmt struct {
@@ -455,6 +457,11 @@ func (q *Query[T]) RunCtx(ctx context.Context) ([]*T, error) {
 	return q.Run(ctx, nil)
 }
 
+func (q *Query[T]) Prefix(group string) *Query[T] {
+	q.tmpPrefix = group
+	return q
+}
+
 func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, error) {
 	if q.err != nil {
 		return nil, q.err
@@ -462,26 +469,24 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 	if len(q.Query) == 0 {
 		q.Build()
 	}
-	//if q.Name != "" {
-	//	_ = ctx_cache.SetWithExpiration[string](ctx, 30*time.Minute, "queries", q.Name, q.Query)
-	//}
 	ctx = CtxWithQueryTag(ctx, q.getName())
 	cacheKey := q.GetCacheKey(args...)
 
-	if q.Cache != nil {
-		data, err := ctx_cache.GetFromCache[[]*T](ctx, q.Cache, q.FromTable.FullTableName(), cacheKey)
-		if err == nil && len(*data) > 0 {
-			return *data, nil
-		}
-	}
-	if q.useCache {
+	if q.useCache || q.Cache != nil {
 		tracer := otel.GetTracerProvider()
 		ctx, span := tracer.Tracer("query-ctx").Start(ctx, fmt.Sprintf("%s-%s", q.Name, q.FromTable.FullTableName()))
 		defer span.End()
-		return ctx_cache.GetSet[[]*T](ctx, q.CacheDuration, q.FromTable.FullTableName(), cacheKey, q.refreshCache, func(ctx context.Context) ([]*T, error) {
-			return q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
-		})
+		return ctx_cache.GetSetCheck[[]*T](ctx, q.CacheDuration, q.FromTable.FullTableName()+q.tmpPrefix, cacheKey, q.refreshCache, func(ctx context.Context, data *[]*T) bool {
+			if data == nil {
+				return false
+			}
+			return len(*data) > 0
+		},
+			func(ctx context.Context) ([]*T, error) {
+				return q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
+			})
 	}
+
 	tracer := otel.GetTracerProvider()
 	ctx, span := tracer.Tracer("query").Start(ctx, fmt.Sprintf("%s-%s", q.Name, q.FromTable.FullTableName()))
 	defer span.End()
@@ -489,9 +494,6 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 	if err != nil {
 		span.RecordError(err)
 		return nil, err
-	}
-	if q.Cache != nil {
-		_ = ctx_cache.SetFromCache[[]*T](ctx, q.Cache, q.FromTable.FullTableName(), cacheKey, data)
 	}
 	return data, nil
 }
@@ -686,7 +688,7 @@ func SelectQuery[T any, X any](ctx context.Context, db DB, q *Query[T], args ...
 		ctx, span := tracer.Tracer("select-query-ctx").Start(ctx, fmt.Sprintf("%s-%s", q.Name, q.FromTable.FullTableName()))
 		defer span.End()
 
-		return ctx_cache.GetSet[[]*X](ctx, q.CacheDuration, q.FromTable.FullTableName(), cacheKey, q.refreshCache, func(ctx context.Context) ([]*X, error) {
+		return ctx_cache.GetSet[[]*X](ctx, q.CacheDuration, q.FromTable.FullTableName()+q.tmpPrefix, cacheKey, q.refreshCache, func(ctx context.Context) ([]*X, error) {
 			rows, err := NamedQuery(ctx, db, q.Query, q.Args(args...))
 			if err != nil {
 				return nil, err

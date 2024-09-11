@@ -44,6 +44,8 @@ type Table[T any] struct {
 	Columns   map[string]Column `json:"columns"`
 	QueryType QueryType         `json:"query_type"`
 	db        DB
+
+	tmpPrefix string
 }
 
 func NewTable[T any](databaseName string, queryType QueryType) (*Table[T], error) {
@@ -476,7 +478,7 @@ func (t *Table[T]) DeleteWithColumns(ctx context.Context, fullTableName string, 
 	if err != nil {
 		return err
 	}
-	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName()+t.tmpPrefix)
 	return nil
 }
 
@@ -653,7 +655,7 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 		err := db.ExecContext(ctx, t.InsertStatement(len(s)), args)
 		if err == nil {
 			span.RecordError(err)
-			_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+			_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName()+t.tmpPrefix)
 		}
 		return generateIds[t.GetGenerateID()[0].Name], err
 	}
@@ -666,7 +668,7 @@ func (t *Table[T]) Insert(ctx context.Context, db DB, s ...T) (string, error) {
 	err = db.ExecContext(ctx, t.InsertStatement(len(s)), args)
 	if err == nil {
 		span.RecordError(err)
-		_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+		_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName()+t.tmpPrefix)
 	}
 	return "", err
 }
@@ -737,7 +739,7 @@ func (t *Table[T]) Upsert(ctx context.Context, db DB, s ...T) (string, error) {
 		err = db.ExecContext(ctx, t.UpsertStatement(len(s)), args)
 		if err == nil {
 			span.RecordError(err)
-			_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+			_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName()+t.tmpPrefix)
 		}
 		return "", err
 	}
@@ -748,7 +750,7 @@ func (t *Table[T]) Upsert(ctx context.Context, db DB, s ...T) (string, error) {
 	err = db.ExecContext(ctx, t.UpsertStatement(len(s)), args)
 	if err == nil {
 		span.RecordError(err)
-		_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+		_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName()+t.tmpPrefix)
 	}
 	return "", err
 }
@@ -769,6 +771,10 @@ func (t *Table[T]) InsertTx(ctx context.Context, db *sqlx.Tx, s ...T) (sql.Resul
 	results, err := db.NamedExecContext(ctx, t.InsertStatement(len(s)), s)
 	return results, "", err
 }
+func (t Table[T]) Prefix(groupPrefix string) *Table[T] {
+	t.tmpPrefix = groupPrefix
+	return &t
+}
 
 func (t *Table[T]) Delete(ctx context.Context, db DB, s T) error {
 	if db == nil {
@@ -785,7 +791,7 @@ func (t *Table[T]) Delete(ctx context.Context, db DB, s T) error {
 		span.RecordError(err)
 		return err
 	}
-	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName()+t.tmpPrefix)
 	return nil
 }
 
@@ -797,7 +803,7 @@ func (t *Table[T]) DeleteTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, 
 	if err != nil {
 		return r, err
 	}
-	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName()+t.tmpPrefix)
 	return r, nil
 }
 
@@ -816,7 +822,7 @@ func (t *Table[T]) Update(ctx context.Context, db DB, s T) error {
 		span.RecordError(err)
 		return err
 	}
-	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName()+t.tmpPrefix)
 	return nil
 }
 
@@ -829,7 +835,7 @@ func (t *Table[T]) UpdateTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, 
 	if err != nil {
 		return nil, err
 	}
-	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName())
+	_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName()+t.tmpPrefix)
 	return r, nil
 }
 
