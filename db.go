@@ -3,6 +3,7 @@ package QueryHelper
 import (
 	"context"
 	"fmt"
+	"github.com/jmoiron/sqlx"
 	"github.com/xwb1989/sqlparser"
 	"regexp"
 	"strings"
@@ -40,7 +41,11 @@ type DB interface {
 type DBRow interface {
 	Next() bool
 	StructScan(i interface{}) error
+	Scan(i ...any) error
+	Close() error
 }
+
+var _ DBRow = &sqlx.Rows{}
 
 type MockDB struct {
 	tables   map[string]*mockTable
