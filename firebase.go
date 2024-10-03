@@ -10,7 +10,7 @@ type FirebaseDB struct {
 	//client *firebase.Client
 }
 
-func (f FirebaseDB) RawQueryContext(ctx context.Context, query string, args ...interface{}) (DBRow, error) {
+func (f FirebaseDB) RawQueryContext(ctx context.Context, query string, options *DBOptions, args ...interface{}) (DBRow, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -39,7 +39,7 @@ func (f FirebaseDB) CreateTable(ctx context.Context, dataset, table string, colu
 	panic("implement me")
 }
 
-func (f FirebaseDB) QueryContext(ctx context.Context, query string, args interface{}) (DBRow, error) {
+func (f FirebaseDB) QueryContext(ctx context.Context, query string, options *DBOptions, args interface{}) (DBRow, error) {
 	//TODO implement me
 	panic("implement me")
 }
