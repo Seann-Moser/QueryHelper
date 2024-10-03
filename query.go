@@ -83,6 +83,8 @@ type Query[T any] struct {
 	OrderByStmt           []Column
 	MapKeyColumns         []Column
 	LimitCount            int
+	NoLock                bool
+	ReadPast              bool
 
 	Cache         ctx_cache.Cache
 	useCache      bool
@@ -221,6 +223,18 @@ func (q *Query[T]) JoinColumn(joinType string, tableColumns Column) *Query[T] {
 		Columns:  map[string]Column{tableColumns.Name: tableColumns},
 		JoinType: joinType,
 	})
+	return q
+}
+
+func (q *Query[T]) EnableNoLock() *Query[T] {
+	q.NoLock = true
+	q.ReadPast = false
+	return q
+}
+
+func (q *Query[T]) EnableReadPast() *Query[T] {
+	q.NoLock = false
+	q.ReadPast = true
 	return q
 }
 
@@ -517,7 +531,8 @@ func (q *Query[T]) GetCacheKey(args ...interface{}) string {
 	argsData := q.Args(args...)
 
 	keys = append(keys, q.FromTable.FullTableName())
-
+	keys = append(keys, strconv.FormatBool(q.NoLock))
+	keys = append(keys, strconv.FormatBool(q.ReadPast))
 	for _, k := range q.SelectColumns {
 		keys = append(keys, k.Name)
 	}
@@ -628,13 +643,19 @@ func (q *Query[T]) buildSqlQuery() *Query[T] {
 	var isGroupBy = len(q.GroupByStmt) > 0
 	var query string
 	selectColumns := q.FromTable.GetSelectableColumns(isGroupBy, q.SelectColumns...)
-
+	withSelect := ""
+	if q.NoLock {
+		withSelect = "WITH (NOLOCK)"
+	}
+	if q.ReadPast {
+		withSelect = "WITH (READPAST)"
+	}
 	if q.FromQuery != nil {
 		q.FromQuery.Build()
-		query = fmt.Sprintf("SELECT\n\t%s\nFROM\n\t(%s)", strings.Join(selectColumns, ",\n\t"), strings.ReplaceAll(q.FromQuery.Query, "\n", "\n\t"))
+		query = fmt.Sprintf("SELECT\n\t%s\nFROM\n\t(%s) %s", strings.Join(selectColumns, ",\n\t"), strings.ReplaceAll(q.FromQuery.Query, "\n", "\n\t"), withSelect)
 
 	} else {
-		query = fmt.Sprintf("SELECT\n\t%s\nFROM\n\t%s", strings.Join(selectColumns, ",\n\t"), q.FromTable.FullTableName())
+		query = fmt.Sprintf("SELECT\n\t%s\nFROM\n\t%s%s", strings.Join(selectColumns, ",\n\t"), q.FromTable.FullTableName(), withSelect)
 
 	}
 
