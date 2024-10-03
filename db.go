@@ -29,12 +29,29 @@ var (
 	}
 )
 
+type DBOptions struct {
+	NoLock   bool
+	ReadPast bool
+}
+
+func (o *DBOptions) EnableNoLock() *DBOptions {
+	o.NoLock = true
+	o.ReadPast = false
+	return o
+}
+
+func (o *DBOptions) EnableReadPast() *DBOptions {
+	o.NoLock = false
+	o.ReadPast = true
+	return o
+}
+
 type DB interface {
 	Ping(ctx context.Context) error
 	CreateTable(ctx context.Context, dataset, table string, columns map[string]Column) error
-	QueryContext(ctx context.Context, query string, args interface{}) (DBRow, error)
+	QueryContext(ctx context.Context, query string, options *DBOptions, args interface{}) (DBRow, error)
 	ExecContext(ctx context.Context, query string, args interface{}) error
-	RawQueryContext(ctx context.Context, query string, args ...interface{}) (DBRow, error)
+	RawQueryContext(ctx context.Context, query string, options *DBOptions, args ...interface{}) (DBRow, error)
 	Close()
 	GetDataset(ds string) string
 }
@@ -54,7 +71,7 @@ type MockDB struct {
 	prefix   string
 }
 
-func (m MockDB) RawQueryContext(ctx context.Context, query string, args ...interface{}) (DBRow, error) {
+func (m MockDB) RawQueryContext(ctx context.Context, query string, options *DBOptions, args ...interface{}) (DBRow, error) {
 	return nil, nil
 }
 
@@ -100,7 +117,7 @@ func (m MockDB) CreateTable(ctx context.Context, dataset, table string, columns 
 	return nil
 }
 
-func (m MockDB) QueryContext(ctx context.Context, query string, args interface{}) (DBRow, error) {
+func (m MockDB) QueryContext(ctx context.Context, query string, options *DBOptions, args interface{}) (DBRow, error) {
 	if valid, err := isSQLValid(query); err != nil && !valid {
 		return nil, fmt.Errorf("invalid query %s: %v", query, err)
 	}

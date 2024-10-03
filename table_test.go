@@ -257,4 +257,10 @@ func TestTable_Prefix(t *testing.T) {
 		t.Fatal("prefix failed")
 	}
 
+	if !auditTable.UseNoLock().useNoLock {
+		t.Fatal("useNoLock failed")
+	}
+	if auditTable.useNoLock {
+		t.Fatal("useNoLock failed")
+	}
 }

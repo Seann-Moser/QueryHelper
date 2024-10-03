@@ -99,24 +99,70 @@ func (s *SqlDB) CreateTable(ctx context.Context, dataset, table string, columns 
 	return nil
 }
 
-func (s *SqlDB) QueryContext(ctx context.Context, query string, args interface{}) (DBRow, error) {
+func (s *SqlDB) QueryContext(ctx context.Context, query string, options *DBOptions, args interface{}) (DBRow, error) {
 	defer func() { //catch or finally
 		if err := recover(); err != nil { //catch
 			fmt.Fprintf(os.Stderr, "Exception: %v\n", err)
 			os.Exit(1)
 		}
 	}()
-	return s.sql.NamedQueryContext(ctx, query, args)
+	if options == nil || !(options.NoLock || options.ReadPast) {
+		return s.sql.NamedQueryContext(ctx, query, args)
+	}
+	tx, err := s.sql.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error starting transaction: %w", err)
+	}
+
+	_, err = tx.Exec("SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED")
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, fmt.Errorf("error setting transaction: %w", err)
+	}
+
+	rows, err := tx.NamedQuery(query, args)
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("error committing query: %w", err)
+	}
+
+	return rows, nil
 }
 
-func (s *SqlDB) RawQueryContext(ctx context.Context, query string, args ...interface{}) (DBRow, error) {
+func (s *SqlDB) RawQueryContext(ctx context.Context, query string, options *DBOptions, args ...interface{}) (DBRow, error) {
 	defer func() { //catch or finally
 		if err := recover(); err != nil { //catch
 			fmt.Fprintf(os.Stderr, "Exception: %v\n", err)
 			os.Exit(1)
 		}
 	}()
-	return s.sql.QueryxContext(ctx, query, args...)
+	if options == nil || !(options.NoLock || options.ReadPast) {
+		return s.sql.QueryxContext(ctx, query, args...)
+	}
+	tx, err := s.sql.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error starting transaction: %w", err)
+	}
+
+	_, err = tx.Exec("SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED")
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, fmt.Errorf("error setting transaction: %w", err)
+	}
+
+	rows, err := tx.QueryxContext(ctx, query, args...)
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("error committing query: %w", err)
+	}
+
+	return rows, nil
 }
 
 func (s *SqlDB) ExecContext(ctx context.Context, query string, args interface{}) error {
@@ -126,7 +172,11 @@ func (s *SqlDB) ExecContext(ctx context.Context, query string, args interface{})
 			os.Exit(1)
 		}
 	}()
-	_, err := s.sql.NamedExecContext(ctx, query, args)
+	tx, err := s.sql.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("error starting transaction: %w", err)
+	}
+	_, err = tx.NamedExecContext(ctx, query, args)
 	return err
 }
 

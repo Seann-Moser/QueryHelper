@@ -496,7 +496,11 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 			}
 			return len(*data) > 0
 		},
+
 			func(ctx context.Context) ([]*T, error) {
+				if q.NoLock || q.ReadPast {
+					return q.FromTable.UseNoLock().NamedSelect(ctx, db, q.Query, q.Args(args))
+				}
 				return q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
 			})
 	}
@@ -504,7 +508,14 @@ func (q *Query[T]) Run(ctx context.Context, db DB, args ...interface{}) ([]*T, e
 	tracer := otel.GetTracerProvider()
 	ctx, span := tracer.Tracer("query").Start(ctx, fmt.Sprintf("%s-%s", q.Name, q.FromTable.FullTableName()))
 	defer span.End()
-	data, err := q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
+	var data []*T
+	var err error
+	if q.NoLock || q.ReadPast {
+		data, err = q.FromTable.UseNoLock().NamedSelect(ctx, db, q.Query, q.Args(args))
+	} else {
+		data, err = q.FromTable.NamedSelect(ctx, db, q.Query, q.Args(args))
+	}
+
 	if err != nil {
 		span.RecordError(err)
 		return nil, err
@@ -644,12 +655,6 @@ func (q *Query[T]) buildSqlQuery() *Query[T] {
 	var query string
 	selectColumns := q.FromTable.GetSelectableColumns(isGroupBy, q.SelectColumns...)
 	withSelect := ""
-	if q.NoLock {
-		withSelect = "WITH (NOLOCK)"
-	}
-	if q.ReadPast {
-		withSelect = "WITH (READPAST)"
-	}
 	if q.FromQuery != nil {
 		q.FromQuery.Build()
 		query = fmt.Sprintf("SELECT\n\t%s\nFROM\n\t(%s) %s", strings.Join(selectColumns, ",\n\t"), strings.ReplaceAll(q.FromQuery.Query, "\n", "\n\t"), withSelect)
@@ -696,7 +701,7 @@ func (q *Query[T]) buildSqlQuery() *Query[T] {
 	return q
 }
 
-func SelectQuery[T any, X any](ctx context.Context, db DB, q *Query[T], args ...interface{}) ([]*X, error) {
+func SelectQuery[T any, X any](ctx context.Context, db DB, q *Query[T], options *DBOptions, args ...interface{}) ([]*X, error) {
 	if len(q.Query) == 0 {
 		q.Build()
 	}
@@ -710,7 +715,7 @@ func SelectQuery[T any, X any](ctx context.Context, db DB, q *Query[T], args ...
 		defer span.End()
 
 		return ctx_cache.GetSet[[]*X](ctx, q.CacheDuration, q.FromTable.FullTableName()+q.tmpPrefix, cacheKey, q.refreshCache, func(ctx context.Context) ([]*X, error) {
-			rows, err := NamedQuery(ctx, db, q.Query, q.Args(args...))
+			rows, err := NamedQuery(ctx, db, q.Query, options, q.Args(args...))
 			if err != nil {
 				return nil, err
 			}
@@ -729,7 +734,7 @@ func SelectQuery[T any, X any](ctx context.Context, db DB, q *Query[T], args ...
 			return output, nil
 		})
 	}
-	rows, err := NamedQuery(ctx, db, q.Query, q.Args(args...))
+	rows, err := NamedQuery(ctx, db, q.Query, options, q.Args(args...))
 	if err != nil {
 		return nil, err
 	}

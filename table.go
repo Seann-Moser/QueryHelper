@@ -48,6 +48,7 @@ type Table[T any] struct {
 	db        DB
 
 	tmpPrefix string
+	useNoLock bool
 }
 
 func NewTable[T any](databaseName string, queryType QueryType) (*Table[T], error) {
@@ -335,6 +336,10 @@ func (t *Table[T]) OrderByColumns(groupBy bool, columns ...Column) string {
 
 	return fmt.Sprintf("ORDER BY %s", strings.Join(orderByValues, ","))
 }
+func (t Table[T]) UseNoLock() *Table[T] {
+	t.useNoLock = true
+	return &t
+}
 
 func (t *Table[T]) IsAutoGenerateID() bool {
 	for _, e := range t.Columns {
@@ -515,7 +520,8 @@ func (t *Table[T]) NamedQuery(ctx context.Context, db DB, query string, args ...
 		return nil, err
 	}
 	query = fixArrays(query, a)
-	return db.QueryContext(ctx, query, a)
+
+	return db.QueryContext(ctx, query, &DBOptions{NoLock: t.useNoLock}, a)
 }
 
 func (t *Table[T]) RawQuery(ctx context.Context, db DB, query string, args ...interface{}) (DBRow, error) {
@@ -530,7 +536,7 @@ func (t *Table[T]) RawQuery(ctx context.Context, db DB, query string, args ...in
 	//	return nil, err
 	//}
 	//query = fixArrays(query, a)
-	return db.RawQueryContext(ctx, query, args...)
+	return db.RawQueryContext(ctx, query, &DBOptions{NoLock: t.useNoLock}, args...)
 }
 
 func (t *Table[T]) NamedExec(ctx context.Context, db DB, query string, args ...interface{}) error {
@@ -856,7 +862,7 @@ func (t *Table[T]) UpdateTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, 
 	return r, nil
 }
 
-func NamedQuery(ctx context.Context, db DB, query string, args ...interface{}) (DBRow, error) {
+func NamedQuery(ctx context.Context, db DB, query string, dbOptions *DBOptions, args ...interface{}) (DBRow, error) {
 	if db == nil {
 		return nil, nil
 	}
@@ -865,7 +871,7 @@ func NamedQuery(ctx context.Context, db DB, query string, args ...interface{}) (
 		return nil, err
 	}
 	query = fixArrays(query, a)
-	return db.QueryContext(ctx, query, a)
+	return db.QueryContext(ctx, query, dbOptions, a)
 }
 
 // ExtractColumns Extracts columns used in WHERE, JOIN, GROUP BY, and ORDER BY clauses
