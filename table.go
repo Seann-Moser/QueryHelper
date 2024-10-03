@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Seann-Moser/ctx_cache"
+	"github.com/xwb1989/sqlparser"
 	"go.opentelemetry.io/otel"
 	"reflect"
 	"regexp"
@@ -16,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+
 	"github.com/jmoiron/sqlx"
 )
 
@@ -516,6 +518,21 @@ func (t *Table[T]) NamedQuery(ctx context.Context, db DB, query string, args ...
 	return db.QueryContext(ctx, query, a)
 }
 
+func (t *Table[T]) Query(ctx context.Context, db DB, query string, args ...interface{}) (DBRow, error) {
+	if db == nil {
+		db = t.db
+	}
+	if db == nil {
+		return nil, nil
+	}
+	//a, err := combineStructs(args...)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//query = fixArrays(query, a)
+	return db.RawQueryContext(ctx, query, args)
+}
+
 func (t *Table[T]) NamedExec(ctx context.Context, db DB, query string, args ...interface{}) error {
 	if db == nil {
 		db = t.db
@@ -849,4 +866,157 @@ func NamedQuery(ctx context.Context, db DB, query string, args ...interface{}) (
 	}
 	query = fixArrays(query, a)
 	return db.QueryContext(ctx, query, a)
+}
+
+// ExtractColumns Extracts columns used in WHERE, JOIN, GROUP BY, and ORDER BY clauses
+func ExtractColumns(query string) ([]string, error) {
+	stmt, err := sqlparser.Parse(query)
+	if err != nil {
+		return nil, err
+	}
+
+	columnSet := make(map[string]struct{})
+
+	switch stmt := stmt.(type) {
+	case *sqlparser.Select:
+		// WHERE clause
+		if stmt.Where != nil {
+			cols := ExtractColumnsFromExpr(stmt.Where.Expr)
+			for _, col := range cols {
+				columnSet[col] = struct{}{}
+			}
+		}
+
+		// JOIN clauses
+		for _, join := range stmt.From {
+			if tableExpr, ok := join.(*sqlparser.JoinTableExpr); ok {
+				if tableExpr.Condition.On != nil {
+					cols := ExtractColumnsFromExpr(tableExpr.Condition.On)
+					for _, col := range cols {
+						columnSet[col] = struct{}{}
+					}
+				}
+			}
+		}
+
+		// GROUP BY clause
+		for _, expr := range stmt.GroupBy {
+			cols := ExtractColumnsFromExpr(expr)
+			for _, col := range cols {
+				columnSet[col] = struct{}{}
+			}
+		}
+
+		// ORDER BY clause
+		for _, order := range stmt.OrderBy {
+			cols := ExtractColumnsFromExpr(order.Expr)
+			for _, col := range cols {
+				columnSet[col] = struct{}{}
+			}
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported statement type")
+	}
+
+	// Convert set to slice
+	var columns []string
+	for col := range columnSet {
+		columns = append(columns, col)
+	}
+
+	return columns, nil
+}
+
+// ExtractColumnsFromExpr Recursively extracts column names from expressions
+func ExtractColumnsFromExpr(expr sqlparser.Expr) []string {
+	var columns []string
+
+	switch expr := expr.(type) {
+	case *sqlparser.ColName:
+		columns = append(columns, expr.Name.String())
+	case *sqlparser.AndExpr:
+		columns = append(columns, ExtractColumnsFromExpr(expr.Left)...)
+		columns = append(columns, ExtractColumnsFromExpr(expr.Right)...)
+	case *sqlparser.OrExpr:
+		columns = append(columns, ExtractColumnsFromExpr(expr.Left)...)
+		columns = append(columns, ExtractColumnsFromExpr(expr.Right)...)
+	case *sqlparser.ComparisonExpr:
+		columns = append(columns, ExtractColumnsFromExpr(expr.Left)...)
+		columns = append(columns, ExtractColumnsFromExpr(expr.Right)...)
+	case *sqlparser.FuncExpr:
+		for _, arg := range expr.Exprs {
+			if aliasedExpr, ok := arg.(*sqlparser.AliasedExpr); ok {
+				columns = append(columns, ExtractColumnsFromExpr(aliasedExpr.Expr)...)
+			}
+		}
+	case *sqlparser.ParenExpr:
+		columns = append(columns, ExtractColumnsFromExpr(expr.Expr)...)
+	case *sqlparser.BinaryExpr:
+		columns = append(columns, ExtractColumnsFromExpr(expr.Left)...)
+		columns = append(columns, ExtractColumnsFromExpr(expr.Right)...)
+		// Add more cases as needed
+	}
+
+	return columns
+}
+
+// GetTableIndexes Retrieves existing indexes for a given table
+func GetTableIndexes(db *sql.DB, tableName string) (map[string][]string, error) {
+	query := `
+        SELECT INDEX_NAME, COLUMN_NAME
+        FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+        ORDER BY SEQ_IN_INDEX
+    `
+	rows, err := db.Query(query, tableName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	indexes := make(map[string][]string)
+	for rows.Next() {
+		var indexName, columnName string
+		if err := rows.Scan(&indexName, &columnName); err != nil {
+			return nil, err
+		}
+		indexes[indexName] = append(indexes[indexName], columnName)
+	}
+
+	return indexes, nil
+}
+
+// SuggestIndexes indexes based on columns used in queries and existing indexes
+func SuggestIndexes(columns []string, existingIndexes map[string][]string) []string {
+	var suggestions []string
+	indexedColumns := make(map[string]struct{})
+
+	// Collect all columns that are already indexed
+	for _, cols := range existingIndexes {
+		for _, col := range cols {
+			indexedColumns[col] = struct{}{}
+		}
+	}
+
+	// Suggest indexes for columns not already indexed
+	for _, col := range columns {
+		if _, exists := indexedColumns[col]; !exists {
+			suggestions = append(suggestions, col)
+		}
+	}
+
+	return suggestions
+}
+
+// GenerateIndexSQL Generates SQL statements to create indexes
+func GenerateIndexSQL(tableName string, columns []string) []string {
+	var sqlStatements []string
+	for _, col := range columns {
+		indexName := fmt.Sprintf("idx_%s_%s", tableName, col)
+		sql := fmt.Sprintf("CREATE INDEX %s ON %s(%s);", indexName, tableName, col)
+		sqlStatements = append(sqlStatements, sql)
+	}
+	return sqlStatements
 }
