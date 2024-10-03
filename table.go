@@ -518,6 +518,21 @@ func (t *Table[T]) NamedQuery(ctx context.Context, db DB, query string, args ...
 	return db.QueryContext(ctx, query, a)
 }
 
+func (t *Table[T]) Query(ctx context.Context, db DB, query string, args ...interface{}) (DBRow, error) {
+	if db == nil {
+		db = t.db
+	}
+	if db == nil {
+		return nil, nil
+	}
+	//a, err := combineStructs(args...)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//query = fixArrays(query, a)
+	return db.RawQueryContext(ctx, query, args)
+}
+
 func (t *Table[T]) NamedExec(ctx context.Context, db DB, query string, args ...interface{}) error {
 	if db == nil {
 		db = t.db
