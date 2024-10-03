@@ -34,7 +34,7 @@ type DB interface {
 	CreateTable(ctx context.Context, dataset, table string, columns map[string]Column) error
 	QueryContext(ctx context.Context, query string, args interface{}) (DBRow, error)
 	ExecContext(ctx context.Context, query string, args interface{}) error
-	RawQueryContext(ctx context.Context, query string, args interface{}) (DBRow, error)
+	RawQueryContext(ctx context.Context, query string, args ...interface{}) (DBRow, error)
 	Close()
 	GetDataset(ds string) string
 }
@@ -54,7 +54,7 @@ type MockDB struct {
 	prefix   string
 }
 
-func (m MockDB) RawQueryContext(ctx context.Context, query string, args interface{}) (DBRow, error) {
+func (m MockDB) RawQueryContext(ctx context.Context, query string, args ...interface{}) (DBRow, error) {
 	return nil, nil
 }
 

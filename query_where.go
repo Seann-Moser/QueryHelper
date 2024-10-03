@@ -123,11 +123,3 @@ func generateWhere(whereStatements []*WhereStmt) string {
 
 	return builder.String()
 }
-
-func generateList(symbol string, count int) string {
-	output := ""
-	for i := 0; i < count; i++ {
-		output += symbol
-	}
-	return output
-}

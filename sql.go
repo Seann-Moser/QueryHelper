@@ -109,14 +109,14 @@ func (s *SqlDB) QueryContext(ctx context.Context, query string, args interface{}
 	return s.sql.NamedQueryContext(ctx, query, args)
 }
 
-func (s *SqlDB) RawQueryContext(ctx context.Context, query string, args interface{}) (DBRow, error) {
+func (s *SqlDB) RawQueryContext(ctx context.Context, query string, args ...interface{}) (DBRow, error) {
 	defer func() { //catch or finally
 		if err := recover(); err != nil { //catch
 			fmt.Fprintf(os.Stderr, "Exception: %v\n", err)
 			os.Exit(1)
 		}
 	}()
-	return s.sql.QueryxContext(ctx, query, args)
+	return s.sql.QueryxContext(ctx, query, args...)
 }
 
 func (s *SqlDB) ExecContext(ctx context.Context, query string, args interface{}) error {

@@ -518,7 +518,7 @@ func (t *Table[T]) NamedQuery(ctx context.Context, db DB, query string, args ...
 	return db.QueryContext(ctx, query, a)
 }
 
-func (t *Table[T]) Query(ctx context.Context, db DB, query string, args ...interface{}) (DBRow, error) {
+func (t *Table[T]) RawQuery(ctx context.Context, db DB, query string, args ...interface{}) (DBRow, error) {
 	if db == nil {
 		db = t.db
 	}
@@ -530,7 +530,7 @@ func (t *Table[T]) Query(ctx context.Context, db DB, query string, args ...inter
 	//	return nil, err
 	//}
 	//query = fixArrays(query, a)
-	return db.RawQueryContext(ctx, query, args)
+	return db.RawQueryContext(ctx, query, args...)
 }
 
 func (t *Table[T]) NamedExec(ctx context.Context, db DB, query string, args ...interface{}) error {

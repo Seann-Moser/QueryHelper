@@ -10,7 +10,7 @@ type FirebaseDB struct {
 	//client *firebase.Client
 }
 
-func (f FirebaseDB) RawQueryContext(ctx context.Context, query string, args interface{}) (DBRow, error) {
+func (f FirebaseDB) RawQueryContext(ctx context.Context, query string, args ...interface{}) (DBRow, error) {
 	//TODO implement me
 	panic("implement me")
 }
