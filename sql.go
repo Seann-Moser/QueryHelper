@@ -172,12 +172,25 @@ func (s *SqlDB) ExecContext(ctx context.Context, query string, args interface{})
 			os.Exit(1)
 		}
 	}()
+	ctxLogger.Debug(ctx, "starting transaction")
 	tx, err := s.sql.BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
 	}
+	ctxLogger.Debug(ctx, "started transaction")
 	_, err = tx.NamedExecContext(ctx, query, args)
-	return err
+	if err != nil {
+		ctxLogger.Debug(ctx, "rolled back transaction")
+		_ = tx.Rollback()
+		return err
+	}
+	ctxLogger.Debug(ctx, "commit transaction")
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("error committing query: %w", err)
+	}
+	ctxLogger.Debug(ctx, "finished transaction")
+
+	return nil
 }
 
 func (s *SqlDB) ColumnUpdater(ctx context.Context, dataset, table string, columns map[string]Column) error {
