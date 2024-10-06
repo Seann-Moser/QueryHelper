@@ -382,6 +382,45 @@ func (t *Table[T]) GenerateID() map[string]string {
 	return m
 }
 
+func (t *Table[T]) GenerateIDs(amount int) map[string]interface{} {
+	m := map[string]interface{}{}
+	colGen := map[string]func() string{}
+
+	for _, e := range t.GetGenerateID() {
+		var genID func() string
+		switch e.AutoGenerateIDType {
+		case "hex":
+			genID = func() string {
+				hasher := sha1.New()
+				hasher.Write([]byte(uuid.New().String()))
+				m[e.Name] = hex.EncodeToString(hasher.Sum(nil))
+				return uuid.New().String()
+			}
+		case "base64":
+			genID = func() string {
+				hasher := sha1.New()
+				hasher.Write([]byte(uuid.New().String()))
+				m[e.Name] = base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+				return uuid.New().String()
+			}
+		case "uuid":
+			fallthrough
+		default:
+			genID = func() string {
+				return uuid.New().String()
+			}
+		}
+		colGen[e.Name] = genID
+	}
+
+	for i := 0; i < amount; i++ {
+		for k, v := range colGen {
+			m[fmt.Sprintf("%d_%s", i, k)] = v()
+		}
+	}
+
+	return m
+}
 func (t *Table[T]) InsertStatement(amount int) string {
 	var columnNames []string
 	var values []string
@@ -715,11 +754,11 @@ func (t *Table[T]) CombineRows(ctx context.Context, rows ...T) (map[string]inter
 		}
 		close(rowI)
 	}()
-	generateIds := t.GenerateID()
+	generateIds := t.GenerateIDs(len(rows))
 	for i := 0; i < Workers; i++ {
 		go func() {
 			for r := range rowI {
-				tmpArgs, err := combineStructs(generateIds, r.data)
+				tmpArgs, err := combineStructs(r.data)
 				if err != nil {
 					continue
 				}
@@ -731,6 +770,10 @@ func (t *Table[T]) CombineRows(ctx context.Context, rows ...T) (map[string]inter
 	}
 	var err error
 	args := map[string]interface{}{}
+	args, err = combineMaps(args, generateIds)
+	if err != nil {
+		return nil, err
+	}
 	for tmpArgs := range c {
 		args, err = combineMaps(args, tmpArgs)
 		if err != nil {
@@ -776,6 +819,21 @@ func (t *Table[T]) Upsert(ctx context.Context, db DB, s ...T) (string, error) {
 		_ = ctx_cache.GlobalCacheMonitor.DeleteCache(ctx, t.FullTableName()+t.tmpPrefix)
 	}
 	return "", err
+}
+
+func (t *Table[T]) UpsertGenerator(ctx context.Context, s ...T) (string, map[string]interface{}, error) {
+	if t.IsAutoGenerateID() {
+		args, err := t.CombineRows(ctx, s...)
+		if err != nil {
+			return "", nil, err
+		}
+		return t.UpsertStatement(len(s)), args, nil
+	}
+	args, err := combineStructsWithPrefix[T](s...)
+	if err != nil {
+		return "", nil, err
+	}
+	return t.UpsertStatement(len(s)), args, nil
 }
 
 func (t *Table[T]) InsertTx(ctx context.Context, db *sqlx.Tx, s ...T) (sql.Result, string, error) {

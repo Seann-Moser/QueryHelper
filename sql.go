@@ -100,12 +100,6 @@ func (s *SqlDB) CreateTable(ctx context.Context, dataset, table string, columns 
 }
 
 func (s *SqlDB) QueryContext(ctx context.Context, query string, options *DBOptions, args interface{}) (DBRow, error) {
-	defer func() { //catch or finally
-		if err := recover(); err != nil { //catch
-			fmt.Fprintf(os.Stderr, "Exception: %v\n", err)
-			os.Exit(1)
-		}
-	}()
 	if options == nil || !(options.NoLock || options.ReadPast) {
 		return s.sql.NamedQueryContext(ctx, query, args)
 	}
@@ -114,7 +108,7 @@ func (s *SqlDB) QueryContext(ctx context.Context, query string, options *DBOptio
 		return nil, fmt.Errorf("error starting transaction: %w", err)
 	}
 
-	_, err = tx.Exec("SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED")
+	_, err = tx.ExecContext(ctx, "SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED")
 	if err != nil {
 		_ = tx.Rollback()
 		return nil, fmt.Errorf("error setting transaction: %w", err)

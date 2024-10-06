@@ -4,7 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"math/rand"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -263,4 +267,66 @@ func TestTable_Prefix(t *testing.T) {
 	if auditTable.useNoLock {
 		t.Fatal("useNoLock failed")
 	}
+}
+
+type Answer struct {
+	AccountID  string `json:"account_id" db:"account_id" csv:"-"`
+	ID         string `json:"id" db:"id" qc:"join;join_name::answer_id;auto_generate_id;group_by_modifier::count" csv:"-"`
+	QuestionID string `json:"question_id" db:"question_id" qc:"primary;join;join_name::question_id;where" csv:"question_id"`
+	SurveyID   string `json:"survey_id" db:"survey_id" qc:"primary;join;" csv:"survey_id"`
+	UID        string `json:"uid" db:"uid" qc:"primary;group_by_modifier::count" csv:"-"`
+	RawUID     string `json:"raw_uid" db:"raw_uid" csv:"-"`
+
+	FloatValue int    `json:"float_value" db:"float_value" qc:"update" csv:"float_value"` // not used
+	IntValue   int    `json:"int_value" db:"int_value" qc:"update" csv:"int_value"`
+	Value      string `json:"value" db:"value" qc:"update;data_value::text" csv:"value"`
+	MetaData   string `json:"meta_data" db:"meta_data" qc:"update;data_value::text" csv:"meta_data"`
+
+	UpdatedTimestamp string `json:"updated_timestamp" db:"updated_timestamp" qc:"skip;default::updated_timestamp"`
+	CreatedTimestamp string `json:"created_timestamp" db:"created_timestamp" qc:"skip;default::created_timestamp" csv:"created_timestamp"`
+}
+
+func TestTable_UpsertGenerator(t *testing.T) {
+	auditTable, err := NewTable[Answer]("survey", QueryTypeSQL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, args, err := auditTable.UpsertGenerator(context.Background(), GenerateAnswers(10)...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg := regexp.MustCompile(`[0-9]+_id`)
+	dup := make(map[string]int)
+	for k, v := range args {
+		if reg.MatchString(k) {
+			if _, f := dup[safeString(v)]; f {
+				t.Errorf("found duplicate id")
+			}
+			dup[safeString(v)] = 1
+		}
+	}
+}
+
+// GenerateAnswers function to create a certain amount of answers
+func GenerateAnswers(count int) []Answer {
+	answers := make([]Answer, count)
+
+	for i := 0; i < count; i++ {
+		answers[i] = Answer{
+			AccountID:        "account_" + strconv.Itoa(i+1),
+			QuestionID:       "question_" + strconv.Itoa(rand.Intn(100)),
+			SurveyID:         "survey_" + strconv.Itoa(rand.Intn(10)),
+			UID:              "uid_" + strconv.Itoa(rand.Intn(1000)),
+			RawUID:           "raw_uid_" + strconv.Itoa(i+1),
+			FloatValue:       rand.Intn(100),
+			IntValue:         rand.Intn(10),
+			Value:            "value_" + strconv.Itoa(i+1),
+			MetaData:         fmt.Sprintf("{\"items_per_page\":\"%d\",\"page\":\"%d\"}", rand.Intn(50)+1, rand.Intn(10)+1),
+			UpdatedTimestamp: time.Now().Format(time.RFC3339),
+			CreatedTimestamp: time.Now().Format(time.RFC3339),
+		}
+	}
+
+	return answers
 }
