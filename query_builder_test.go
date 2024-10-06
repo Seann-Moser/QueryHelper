@@ -43,21 +43,6 @@ func TestQuery_Build(t *testing.T) {
 	//println(args)
 }
 
-type Answer struct {
-	AccountID  string `json:"account_id" db:"account_id"`
-	ID         string `json:"id" db:"id" qc:"primary;join;join_name::answer_id;auto_generate_id;group_by_modifier::count"`
-	QuestionID string `json:"question_id" db:"question_id" qc:"primary;join;join_name::question_id;where"`
-	SurveyID   string `json:"survey_id" db:"survey_id" qc:"primary;join;"`
-	UID        string `json:"uid" db:"uid" qc:"primary;group_by_modifier::count"`
-
-	FloatValue float64 `json:"float_value" db:"float_value" qc:"update"`
-	IntValue   int     `json:"int_value" db:"int_value" qc:"update"`
-	Value      string  `json:"value" db:"value" qc:"update;data_value::text"`
-
-	Status           int    `json:"status" db:"status" qc:"update"`
-	CreatedTimestamp string `json:"created_timestamp" db:"created_timestamp" qc:"skip;default::created_timestamp"`
-}
-
 func TestQuery_BuildGroupBy(t *testing.T) {
 	answerTable, err := NewTable[Answer]("test", QueryTypeSQL)
 	if err != nil {
