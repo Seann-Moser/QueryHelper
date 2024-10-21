@@ -9,8 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Seann-Moser/ctx_cache"
+	"github.com/Seann-Moser/go-serve/pkg/ctxLogger"
 	"github.com/xwb1989/sqlparser"
 	"go.opentelemetry.io/otel"
+	"go.uber.org/zap"
 	"reflect"
 	"regexp"
 	"sort"
@@ -132,6 +134,41 @@ func (t *Table[T]) GetColumn(name string) Column {
 		return column
 	}
 	return Column{}
+}
+
+func (t *Table[T]) AddMissingColumns(ctx context.Context, db *sqlx.DB) error {
+	// Get the current columns in the table from the database
+
+	dbColumns, err := t.GetDef()
+	if err != nil {
+		return fmt.Errorf("failed to get current columns from database: %v", err)
+	}
+
+	// Convert the result into a map for easier comparison
+	dbColumnMap := make(map[string]ColumnInfo)
+	for _, dbColumn := range dbColumns {
+		dbColumnMap[dbColumn.ColumnName] = dbColumn
+	}
+
+	// Iterate through the defined columns in the Table struct
+	for columnName, column := range t.Columns {
+		// If the column is missing in the database
+		if _, exists := dbColumnMap[columnName]; !exists {
+			// Add the column to the database
+			columnDef := column.GetDefinition()
+
+			// Construct the ADD COLUMN query
+			addColumnQuery := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s;", t.Name, columnDef)
+
+			// Execute the query
+			_, err := db.Exec(addColumnQuery)
+			if err != nil {
+				return fmt.Errorf("failed to add column %s: %v", columnName, err)
+			}
+			ctxLogger.Info(ctx, "Successfully added missing column", zap.String("table", t.Name), zap.String("column", columnName))
+		}
+	}
+	return nil
 }
 
 func (t *Table[T]) InitializeTable(ctx context.Context, db DB, suffix ...string) error {
