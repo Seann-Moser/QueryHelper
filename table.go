@@ -148,6 +148,12 @@ func (t *Table[T]) InitializeTable(ctx context.Context, db DB, suffix ...string)
 	}
 	return nil
 }
+func (t *Table[T]) GetDef() ([]ColumnInfo, error) {
+	return t.db.GetTableDefinition(t.Dataset, t.Name)
+}
+func (t *Table[T]) GetIndexes() ([]IndexInfo, error) {
+	return t.db.GetTableIndexes(t.Dataset, t.Name)
+}
 
 func (t *Table[T]) GetColumns() map[string]Column {
 	c := map[string]Column{}

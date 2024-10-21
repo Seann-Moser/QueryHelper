@@ -10,6 +10,16 @@ type FirebaseDB struct {
 	//client *firebase.Client
 }
 
+func (f FirebaseDB) GetTableIndexes(database, tableName string) ([]IndexInfo, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (f FirebaseDB) GetTableDefinition(database string, tableName string) ([]ColumnInfo, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (f FirebaseDB) RawQueryContext(ctx context.Context, query string, options *DBOptions, args ...interface{}) (DBRow, error) {
 	//TODO implement me
 	panic("implement me")

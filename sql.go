@@ -284,3 +284,47 @@ func generateColumnTypeStmt(columnType string, e *sql.ColumnType) string {
 	}
 	return ""
 }
+
+type IndexInfo struct {
+	IndexName  string `db:"INDEX_NAME" json:"index_name"`
+	ColumnName string `db:"COLUMN_NAME" json:"column_name"`
+	NonUnique  int    `db:"NON_UNIQUE" json:"non_unique"`
+	SeqInIndex int    `db:"SEQ_IN_INDEX" json:"seq_in_index"`
+}
+
+type ColumnInfo struct {
+	ColumnName    string `db:"COLUMN_NAME" json:"column_name"`
+	ColumnType    string `db:"COLUMN_TYPE" json:"column_type"`
+	IsNullable    string `db:"IS_NULLABLE" json:"is_nullable"`
+	ColumnKey     string `db:"COLUMN_KEY" json:"column_key"`
+	ColumnDefault string `db:"COLUMN_DEFAULT" json:"column_default"`
+	Extra         string `db:"EXTRA" json:"extra"`
+}
+
+func (s *SqlDB) GetTableDefinition(database string, tableName string) ([]ColumnInfo, error) {
+	query := `SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_KEY, COLUMN_DEFAULT, EXTRA
+			  FROM information_schema.columns
+			  WHERE table_schema = ? AND table_name = ?`
+
+	var columns []ColumnInfo
+	err := s.sql.Select(&columns, query, database, tableName)
+	if err != nil {
+		return nil, err
+	}
+
+	return columns, nil
+}
+
+func (s *SqlDB) GetTableIndexes(database, tableName string) ([]IndexInfo, error) {
+	query := `SELECT INDEX_NAME, COLUMN_NAME, NON_UNIQUE, SEQ_IN_INDEX
+			  FROM information_schema.statistics
+			  WHERE table_schema = ? AND table_name = ?`
+
+	var indexes []IndexInfo
+	err := s.sql.Select(&indexes, query, database, tableName)
+	if err != nil {
+		return nil, err
+	}
+
+	return indexes, nil
+}
