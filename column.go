@@ -43,6 +43,9 @@ type Column struct {
 	ignoreGroupBy      bool
 	SelectAs           string `json:"as"`
 	Ignore             bool   `json:"ignore"`
+
+	Encrypt bool `json:"encrypt"`
+	Decrypt bool `json:"decrypt"`
 }
 
 func (c Column) Wrap(wrap string) Column {

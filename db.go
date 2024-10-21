@@ -52,6 +52,8 @@ type DB interface {
 	QueryContext(ctx context.Context, query string, options *DBOptions, args interface{}) (DBRow, error)
 	ExecContext(ctx context.Context, query string, args interface{}) error
 	RawQueryContext(ctx context.Context, query string, options *DBOptions, args ...interface{}) (DBRow, error)
+	GetTableIndexes(database, tableName string) ([]IndexInfo, error)
+	GetTableDefinition(database string, tableName string) ([]ColumnInfo, error)
 	Close()
 	GetDataset(ds string) string
 }
@@ -69,6 +71,14 @@ type MockDB struct {
 	tables   map[string]*mockTable
 	mockData map[string]map[string]*mockData
 	prefix   string
+}
+
+func (m MockDB) GetTableIndexes(database, tableName string) ([]IndexInfo, error) {
+	return nil, nil
+}
+
+func (m MockDB) GetTableDefinition(database string, tableName string) ([]ColumnInfo, error) {
+	return nil, nil
 }
 
 func (m MockDB) RawQueryContext(ctx context.Context, query string, options *DBOptions, args ...interface{}) (DBRow, error) {
