@@ -946,6 +946,7 @@ func (t *Table[T]) Update(ctx context.Context, db DB, old, s T, columns ...*Colu
 	tracer := otel.GetTracerProvider()
 	ctx, span := tracer.Tracer("update").Start(ctx, t.FullTableName())
 	defer span.End()
+
 	data, err := combineStructs(old)
 	if err != nil {
 		return err
@@ -954,7 +955,8 @@ func (t *Table[T]) Update(ctx context.Context, db DB, old, s T, columns ...*Colu
 	if err != nil {
 		return err
 	}
-	args := AddPrefix("old", data)
+
+	args := AddPrefix("old_", data)
 	args, err = combineMaps(args, n)
 	if err != nil {
 		return err
