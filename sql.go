@@ -172,7 +172,7 @@ func (s *SqlDB) ExecContext(ctx context.Context, query string, args interface{})
 	}
 	_, err = tx.NamedExecContext(ctx, query, args)
 	if err != nil {
-		ctxLogger.Warn(ctx, "rolled back transaction")
+		ctxLogger.Warn(ctx, "rolled back transaction", zap.String("query", query))
 		_ = tx.Rollback()
 		return err
 	}
