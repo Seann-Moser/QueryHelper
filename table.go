@@ -510,12 +510,14 @@ func (t *Table[T]) UpsertStatement(amount int) string {
 	return fmt.Sprintf("%s\n%s\n%s", insert, onDuplicate, strings.Join(setValues, ",\n"))
 }
 
-func (t *Table[T]) UpdateStatement(updateColumns ...*Column) string {
+func (t *Table[T]) UpdateStatement(updateColumns ...Column) string {
 	var setValues []string
 	var whereValues []string
-	if updateColumns == nil {
+	if len(updateColumns) > 0 {
 		for _, e := range updateColumns {
-			setValues = append(setValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
+			if e.Update {
+				setValues = append(setValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
+			}
 		}
 	}
 	for _, e := range t.Columns {
@@ -524,7 +526,7 @@ func (t *Table[T]) UpdateStatement(updateColumns ...*Column) string {
 		} else if e.AutoGenerateID {
 			whereValues = append(whereValues, fmt.Sprintf("%s = :old_%s", e.Name, e.Name))
 		}
-		if !e.Update {
+		if !e.Update || len(updateColumns) > 0 {
 			continue
 		}
 		setValues = append(setValues, fmt.Sprintf("%s = :%s", e.Name, e.Name))
@@ -936,7 +938,17 @@ func (t *Table[T]) DeleteTx(ctx context.Context, db *sqlx.Tx, s T) (sql.Result, 
 	return r, nil
 }
 
-func (t *Table[T]) Update(ctx context.Context, db DB, old, s T, columns ...*Column) error {
+func (t *Table[T]) GetNonEmptyColumns(data map[string]interface{}) []Column {
+	var foundColumns []Column
+	for k, _ := range data {
+		if c, found := t.Columns[k]; found {
+			foundColumns = append(foundColumns, c)
+		}
+	}
+	return foundColumns
+}
+
+func (t *Table[T]) Update(ctx context.Context, db DB, old, s T, allowEmpty bool) error {
 	if db == nil {
 		db = t.db
 	}
@@ -951,6 +963,10 @@ func (t *Table[T]) Update(ctx context.Context, db DB, old, s T, columns ...*Colu
 	if err != nil {
 		return err
 	}
+	var c []Column
+	if allowEmpty {
+		c = t.GetNonEmptyColumns(data)
+	}
 	n, err := combineStructs(s)
 	if err != nil {
 		return err
@@ -961,7 +977,7 @@ func (t *Table[T]) Update(ctx context.Context, db DB, old, s T, columns ...*Colu
 	if err != nil {
 		return err
 	}
-	err = db.ExecContext(ctx, t.UpdateStatement(columns...), args)
+	err = db.ExecContext(ctx, t.UpdateStatement(c...), args)
 	if err != nil {
 		span.RecordError(err)
 		return err
