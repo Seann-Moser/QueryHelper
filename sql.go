@@ -108,13 +108,14 @@ func (s *SqlDB) CreateTable(ctx context.Context, dataset, table string, columns 
 	// Build the SQL queries
 	createSchemaStatement, createTableStatement, err := s.BuildCreateTableQueries(dataset, table, columns)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed BuildCreateTableQueries: %w", err)
 	}
 
 	// Execute the SQL statements
 	for _, stmt := range []string{createSchemaStatement, createTableStatement} {
 		_, err := s.sql.ExecContext(ctx, stmt)
 		if err != nil {
+			ctxLogger.Error(ctx, "failed creating tables", zap.Error(err), zap.String("statement", stmt))
 			return err
 		}
 	}
