@@ -20,7 +20,7 @@ func TestCacheTest(t *testing.T) {
 	go ctx_cache.GlobalCacheMonitor.Start(ctx)
 	table, err := NewTable[AccountUserRole]("test", "")
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 
 	q := QueryTable[AccountUserRole](table)
@@ -28,20 +28,26 @@ func TestCacheTest(t *testing.T) {
 	q.Where(q.Column("user_id"), "=", "AND", 0, "")
 	q.UseCache()
 	q.SetName("rbac-accounts-for-user")
-	q.Run(ctx, nil)
-
+	_, err = q.Run(ctx, nil)
+	if err != nil {
+		t.Error(err.Error())
+	}
 	aur := &AccountUserRole{
 		AccountID: "",
 		UserID:    "",
 		RoleID:    "",
 	}
 	_, err = table.Insert(ctx, nil, *aur)
-
+	if err != nil {
+		t.Error(err.Error())
+	}
 	qt := QueryTable[AccountUserRole](table)
 	//if !isSuperAdmin {
 	qt.Where(q.Column("user_id"), "=", "AND", 0, "")
 	qt.UseCache()
 	qt.SetName("rbac-accounts-for-user")
-	qt.Run(ctx, nil)
-
+	_, err = qt.Run(ctx, nil)
+	if err != nil {
+		t.Error(err.Error())
+	}
 }

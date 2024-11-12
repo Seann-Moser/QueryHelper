@@ -12,6 +12,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 )
 
 var _ DB = &SqlDB{}
@@ -28,6 +29,7 @@ func Flags() *pflag.FlagSet {
 	fs.String("sql-db-prefix", "", "")
 	return fs
 }
+
 func NewSql(db *sqlx.DB) *SqlDB {
 	return &SqlDB{
 		sql:           db,
@@ -37,6 +39,8 @@ func NewSql(db *sqlx.DB) *SqlDB {
 }
 
 func (s *SqlDB) Ping(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
 	return s.sql.PingContext(ctx)
 }
 
@@ -48,55 +52,87 @@ func (s *SqlDB) GetDataset(ds string) string {
 	return fmt.Sprintf("%s%s", s.tablePrefix, ds)
 }
 
-func (s *SqlDB) CreateTable(ctx context.Context, dataset, table string, columns map[string]Column) error {
-	createSchemaStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", dataset)
-	var PrimaryKeys []string
-	var FK []string
-	createStatement := ""
-	createStatement += fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s(", dataset, table)
+func (s *SqlDB) BuildCreateTableQueries(dataset, table string, columns map[string]Column) (string, string, error) {
+	// Build the CREATE SCHEMA statement
+	createSchemaStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS `%s`", dataset)
 
-	var c []Column
+	// Initialize variables
+	var primaryKeys []string
+	var foreignKeys []string
+	createTableStatement := fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s`.`%s` (", dataset, table)
 
+	// Convert the columns map to a slice and sort them
+	var cols []Column
 	for _, column := range columns {
-		c = append(c, column)
+		cols = append(cols, column)
 	}
-
-	sort.Slice(c, func(i, j int) bool {
-		return c[i].ColumnOrder < c[j].ColumnOrder
+	sort.Slice(cols, func(i, j int) bool {
+		return cols[i].ColumnOrder < cols[j].ColumnOrder
 	})
 
-	for _, column := range c {
-		createStatement += column.GetDefinition() + ","
+	// Build column definitions
+	for _, column := range cols {
+		def := column.GetDefinition()
+		createTableStatement += def + ","
 		if column.HasFK() {
-			FK = append(FK, column.GetFK())
+			fk, err := column.GetFK()
+			if err != nil {
+				return "", "", err
+			}
+			foreignKeys = append(foreignKeys, fk)
 		}
 		if column.Primary {
-			PrimaryKeys = append(PrimaryKeys, column.Name)
+			primaryKeys = append(primaryKeys, column.Name)
 		}
 	}
-	if len(PrimaryKeys) == 0 {
-		return MissingPrimaryKeyErr
-	} else if len(PrimaryKeys) == 1 {
-		createStatement += fmt.Sprintf("\n\tPRIMARY KEY(%s)", PrimaryKeys[0])
+
+	// Handle primary keys
+	if len(primaryKeys) == 0 {
+		return "", "", MissingPrimaryKeyErr
+	} else if len(primaryKeys) == 1 {
+		createTableStatement += fmt.Sprintf("\n\tPRIMARY KEY(`%s`)", primaryKeys[0])
 	} else {
-		createStatement += fmt.Sprintf("\n\tCONSTRAINT PK_%s_%s PRIMARY KEY (%s)", dataset, table, strings.Join(PrimaryKeys, ","))
-
+		createTableStatement += fmt.Sprintf("\n\tCONSTRAINT `PK_%s_%s` PRIMARY KEY (%s)", dataset, table, joinQuoted(primaryKeys, ","))
 	}
-	if len(FK) > 0 {
-		createStatement += "," + strings.Join(FK, ",")
-	}
-	createStatement += "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8"
 
-	for _, stmt := range []string{createSchemaStatement, createStatement} {
+	// Append foreign keys if any
+	if len(foreignKeys) > 0 {
+		createTableStatement += "," + strings.Join(foreignKeys, ",")
+	}
+	createTableStatement += "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+
+	return createSchemaStatement, createTableStatement, nil
+}
+
+func (s *SqlDB) CreateTable(ctx context.Context, dataset, table string, columns map[string]Column) error {
+	// Build the SQL queries
+	createSchemaStatement, createTableStatement, err := s.BuildCreateTableQueries(dataset, table, columns)
+	if err != nil {
+		return err
+	}
+
+	// Execute the SQL statements
+	for _, stmt := range []string{createSchemaStatement, createTableStatement} {
 		_, err := s.sql.ExecContext(ctx, stmt)
 		if err != nil {
 			return err
 		}
 	}
+
+	// Optionally update columns
 	if s.updateColumns {
 		return s.ColumnUpdater(ctx, dataset, table, columns)
 	}
 	return nil
+}
+
+// Helper function to quote identifiers
+func joinQuoted(items []string, sep string) string {
+	quotedItems := make([]string, len(items))
+	for i, item := range items {
+		quotedItems[i] = fmt.Sprintf("`%s`", item)
+	}
+	return strings.Join(quotedItems, sep)
 }
 
 func (s *SqlDB) QueryContext(ctx context.Context, query string, options *DBOptions, args interface{}) (DBRow, error) {
@@ -163,9 +199,9 @@ func (s *SqlDB) ExecContext(ctx context.Context, query string, args interface{})
 	defer func() { //catch or finally
 		if err := recover(); err != nil { //catch
 			fmt.Fprintf(os.Stderr, "Exception: %v\n", err)
-			os.Exit(1)
 		}
 	}()
+
 	tx, err := s.sql.BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)

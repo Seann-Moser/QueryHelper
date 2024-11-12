@@ -48,6 +48,49 @@ type Column struct {
 	Decrypt bool `json:"decrypt"`
 }
 
+// GetDefinition Adjust the Column methods accordingly
+func (col *Column) GetDefinition() string {
+	// Properly quote the column name
+	name := fmt.Sprintf("`%s`", col.Name)
+	// Build the type and default value
+	definition := fmt.Sprintf("%s %s", name, col.Type)
+	if !col.Null {
+		definition += " NOT NULL"
+	}
+	switch col.Default {
+	case "created_timestamp":
+		definition += " DEFAULT NOW()"
+	case "updated_timestamp":
+		definition += " DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+	default:
+		if col.Default != "" {
+			// Ensure the default value is compatible with MySQL 8
+			definition += fmt.Sprintf(" DEFAULT %s", col.Default)
+		}
+	}
+
+	if col.AutoGenerateID {
+		definition += " AUTO_INCREMENT"
+	}
+	return definition
+}
+
+func (col *Column) HasFK() bool {
+	if len(col.ForeignKey) > 0 && len(col.ForeignTable) > 0 {
+		return col.ForeignKey != ""
+	}
+	return false
+}
+
+func (col *Column) GetFK() (string, error) {
+	// Properly quote identifiers
+	constraintName := fmt.Sprintf("`FK_%s_%s`", col.Table, col.Name)
+	columnName := fmt.Sprintf("`%s`", col.Name)
+	foreignTable := fmt.Sprintf("`%s`.`%s`", col.ForeignSchema, col.ForeignTable)
+	foreignColumn := fmt.Sprintf("`%s`", col.ForeignKey)
+	return fmt.Sprintf("\n\tCONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s (%s)", constraintName, columnName, foreignTable, foreignColumn), nil
+}
+
 func (c Column) Wrap(wrap string) Column {
 	c.Wrapper = wrap
 	return c
@@ -66,30 +109,6 @@ func (c Column) SetDataset(d string) Column {
 func (c Column) As(as string) Column {
 	c.SelectAs = as
 	return c
-}
-
-func (c *Column) GetDefinition() string {
-	elementString := fmt.Sprintf("\n\t%s %s", c.Name, c.Type)
-	if !c.Null {
-		elementString += " NOT NULL"
-	}
-	switch c.Default {
-	case "created_timestamp":
-		elementString += " DEFAULT NOW()"
-	case "updated_timestamp":
-		elementString += " DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
-	case "":
-		if c.Null {
-			elementString += " DEFAULT NULL"
-		}
-	default:
-		elementString += fmt.Sprintf(" DEFAULT %s", c.Default)
-	}
-	return elementString
-}
-
-func (c *Column) HasFK() bool {
-	return len(c.ForeignKey) > 0 && len(c.ForeignTable) > 0
 }
 
 func (c *Column) FullName(groupBy bool, inSelect bool) string {
@@ -132,13 +151,6 @@ func (c *Column) GetFKReference() string {
 	}
 	reference += fmt.Sprintf("%s(%s)", c.ForeignTable, c.ForeignKey)
 	return reference
-}
-
-func (c *Column) GetFK() string {
-	if c.HasFK() {
-		return fmt.Sprintf("\n\tFOREIGN KEY (%s) REFERENCES %s ON DELETE CASCADE on update cascade", c.Name, c.GetFKReference())
-	}
-	return ""
 }
 
 func (c *Column) GetUpdateStmt(add bool) string {

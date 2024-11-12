@@ -119,7 +119,7 @@ func DeleteCtx[T any](ctx context.Context, data *T, suffix ...string) error {
 	return table.Delete(ctx, nil, *data)
 }
 
-func UpdateCtx[T any](ctx context.Context, old, data *T, allowEmpty bool, suffix ...string) error {
+func UpdateCtx[T any](ctx context.Context, data *T, suffix ...string) error {
 	table, err := GetTableCtx[T](ctx, suffix...)
 	if err != nil {
 		return err
@@ -127,7 +127,7 @@ func UpdateCtx[T any](ctx context.Context, old, data *T, allowEmpty bool, suffix
 	if data == nil {
 		return fmt.Errorf("no data provided")
 	}
-	return table.Update(ctx, nil, *old, *data, allowEmpty)
+	return table.Update(ctx, nil, *data)
 }
 
 func ListCtx[T any](ctx context.Context, stmt ...*WhereStmt) ([]*T, error) {
