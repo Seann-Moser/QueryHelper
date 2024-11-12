@@ -69,7 +69,7 @@ func (col *Column) GetDefinition() string {
 		}
 	}
 
-	if col.AutoGenerateID {
+	if col.AutoGenerateID && strings.Contains(strings.ToLower(col.Type), "int") {
 		definition += " AUTO_INCREMENT"
 	}
 	return definition
