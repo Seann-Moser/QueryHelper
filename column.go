@@ -76,8 +76,11 @@ func (col *Column) GetDefinition() string {
 }
 
 func (col *Column) HasFK() bool {
+	if col.ForeignSchema == "" {
+		col.ForeignSchema = col.Dataset
+	}
 	if len(col.ForeignKey) > 0 && len(col.ForeignTable) > 0 {
-		return col.ForeignKey != ""
+		return col.ForeignKey != "" && col.ForeignSchema != ""
 	}
 	return false
 }
@@ -86,6 +89,9 @@ func (col *Column) GetFK() (string, error) {
 	// Properly quote identifiers
 	constraintName := fmt.Sprintf("`FK_%s_%s`", col.Table, col.Name)
 	columnName := fmt.Sprintf("`%s`", col.Name)
+	if col.ForeignSchema == "" {
+		col.ForeignSchema = col.Dataset
+	}
 	foreignTable := fmt.Sprintf("`%s`.`%s`", col.ForeignSchema, col.ForeignTable)
 	foreignColumn := fmt.Sprintf("`%s`", col.ForeignKey)
 	return fmt.Sprintf("\n\tCONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s (%s)", constraintName, columnName, foreignTable, foreignColumn), nil
