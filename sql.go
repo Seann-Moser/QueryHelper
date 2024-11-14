@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -69,6 +70,7 @@ func (s *SqlDB) BuildCreateTableQueries(dataset, table string, columns map[strin
 	sort.Slice(cols, func(i, j int) bool {
 		return cols[i].ColumnOrder < cols[j].ColumnOrder
 	})
+	var primaryKeyColumns []Column
 
 	// Build column definitions
 	for _, column := range cols {
@@ -83,9 +85,12 @@ func (s *SqlDB) BuildCreateTableQueries(dataset, table string, columns map[strin
 		}
 		if column.Primary {
 			primaryKeys = append(primaryKeys, column.Name)
+			primaryKeyColumns = append(primaryKeyColumns, column)
 		}
 	}
-
+	if _, err := s.CheckPrimaryKeyLength(primaryKeyColumns); err != nil {
+		return "", "", err
+	}
 	// Handle primary keys
 	if len(primaryKeys) == 0 {
 		return "", "", MissingPrimaryKeyErr
@@ -362,11 +367,42 @@ func (s *SqlDB) GetTableIndexes(database, tableName string) ([]IndexInfo, error)
 	return indexes, nil
 }
 func (s *SqlDB) Version() string {
+	if s.sql == nil {
+		return "8.0.40"
+	}
 	v, err := GetMySQLVersion(s.sql)
 	if err != nil {
 		return "unknown"
 	}
 	return v
+}
+
+const defaultMaxPrimaryKeyLength = 767
+
+// CheckPrimaryKeyLength checks if the combined byte length of primary key columns exceeds the limit
+func (s *SqlDB) CheckPrimaryKeyLength(columns []Column) (bool, error) {
+	// Get MySQL version to adjust max primary key length if needed
+	version := s.Version()
+	maxPrimaryKeyLength := defaultMaxPrimaryKeyLength
+
+	// Example check for newer MySQL versions (adjust as needed for version-specific handling)
+	if CompareVersions(version, "8.0.17") > 0 {
+		maxPrimaryKeyLength = 3072 // Increased max length for MySQL 8.0.17+ with InnoDB and utf8mb4
+	}
+
+	// Calculate total byte length of the primary key columns
+	totalLength := 0
+	for _, col := range columns {
+		if col.Primary {
+			totalLength += col.GetByteLength()
+		}
+	}
+
+	// Check if total length exceeds the maximum allowed length
+	if totalLength > maxPrimaryKeyLength {
+		return true, fmt.Errorf("primary key length exceeds the maximum allowed length of %d bytes", maxPrimaryKeyLength)
+	}
+	return false, nil
 }
 
 // GetMySQLVersion retrieves the MySQL version from the database.
@@ -377,4 +413,37 @@ func GetMySQLVersion(db *sqlx.DB) (string, error) {
 		return "", fmt.Errorf("failed to get MySQL version: %w", err)
 	}
 	return version, nil
+}
+
+func CompareVersions(version1, version2 string) int {
+	v1Parts := strings.Split(version1, ".")
+	v2Parts := strings.Split(version2, ".")
+
+	// Compare each part numerically
+	maxParts := len(v1Parts)
+	if len(v2Parts) > maxParts {
+		maxParts = len(v2Parts)
+	}
+
+	for i := 0; i < maxParts; i++ {
+		var v1, v2 int
+
+		// Convert the current part to an integer or assume 0 if part is missing
+		if i < len(v1Parts) {
+			v1, _ = strconv.Atoi(v1Parts[i])
+		}
+		if i < len(v2Parts) {
+			v2, _ = strconv.Atoi(v2Parts[i])
+		}
+
+		// Compare the individual parts
+		if v1 > v2 {
+			return 1
+		} else if v1 < v2 {
+			return -1
+		}
+	}
+
+	// Versions are equal
+	return 0
 }

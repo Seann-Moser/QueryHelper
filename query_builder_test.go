@@ -8,7 +8,7 @@ import (
 )
 
 type Resource struct {
-	ID           string `json:"id" db:"id" qc:"primary;join;join_name::resource_id;group_by_modifier::count"` // ID ("resource.*")
+	ID           string `json:"id" db:"id" qc:"primary;join;join_name::resource_id;data_type::varchar(1024);charset::utf8"` // ID ("resource.*")
 	Description  string `json:"description" db:"description" qc:"data_type::varchar(512);update"`
 	ResourceType string `json:"resource_type" db:"resource_type" qc:"update"` // ResourceType "url"
 	Data         string `json:"data" db:"data" qc:"update;text"`
@@ -18,6 +18,19 @@ type Resource struct {
 	CreatedTimestamp string `json:"created_timestamp" db:"created_timestamp" qc:"skip;default::created_timestamp"`
 }
 
+func TestSqlDB_CreateTable(t *testing.T) {
+	table, err := NewTable[Resource]("test", QueryTypeSQL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := SqlDB{}
+	schema, tableCreate, err := db.BuildCreateTableQueries("test", "resource", table.Columns)
+	if err != nil {
+		t.Fatal(err)
+	}
+	println(schema)
+	println(tableCreate)
+}
 func TestQuery_Build(t *testing.T) {
 	table, err := NewTable[Resource]("test", QueryTypeSQL)
 	if err != nil {

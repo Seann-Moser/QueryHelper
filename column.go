@@ -71,7 +71,8 @@ func GetAllNumbersAsInt(input string) ([]int, error) {
 // Calculates the byte length of the column based on charset and type
 func (c *Column) GetByteLength() int {
 	// Handle variable-length types like CHAR and VARCHAR with overrides
-	if strings.HasPrefix(c.Type, "CHAR") || strings.HasPrefix(c.Type, "VARCHAR") {
+	t := strings.ToLower(c.Type)
+	if strings.HasPrefix(t, "char") || strings.HasPrefix(t, "varchar") {
 		// Multiply length by charset bytes for CHAR and VARCHAR
 		l, _ := GetAllNumbersAsInt(c.Type)
 		baseLength := 256
@@ -121,7 +122,8 @@ func (col *Column) GetDefinition() string {
 		definition += " AUTO_INCREMENT"
 	}
 	// Add charset if specified and relevant to the type (e.g., CHAR, VARCHAR, TEXT)
-	if col.Charset != "" && (strings.HasPrefix(col.Type, "CHAR") || strings.HasPrefix(col.Type, "VARCHAR") || col.Type == "TEXT" || col.Type == "JSON") {
+	t := strings.ToLower(col.Type)
+	if col.Charset != "" && (strings.HasPrefix(t, "char") || strings.HasPrefix(t, "varchar") || t == "text" || t == "json") {
 		definition += fmt.Sprintf(" CHARACTER SET %s", col.Charset)
 	}
 	return definition
