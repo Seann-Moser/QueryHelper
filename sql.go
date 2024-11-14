@@ -88,9 +88,9 @@ func (s *SqlDB) BuildCreateTableQueries(dataset, table string, columns map[strin
 			primaryKeyColumns = append(primaryKeyColumns, column)
 		}
 	}
-	if _, err := s.CheckPrimaryKeyLength(primaryKeyColumns); err != nil {
-		return "", "", err
-	}
+	//if _, err := s.CheckPrimaryKeyLength(primaryKeyColumns); err != nil {
+	//	return "", "", err
+	//}
 	// Handle primary keys
 	if len(primaryKeys) == 0 {
 		return "", "", MissingPrimaryKeyErr
