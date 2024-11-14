@@ -361,3 +361,20 @@ func (s *SqlDB) GetTableIndexes(database, tableName string) ([]IndexInfo, error)
 
 	return indexes, nil
 }
+func (s *SqlDB) Version() string {
+	v, err := GetMySQLVersion(s.sql)
+	if err != nil {
+		return "unknown"
+	}
+	return v
+}
+
+// GetMySQLVersion retrieves the MySQL version from the database.
+func GetMySQLVersion(db *sqlx.DB) (string, error) {
+	var version string
+	err := db.Get(&version, "SELECT VERSION()")
+	if err != nil {
+		return "", fmt.Errorf("failed to get MySQL version: %w", err)
+	}
+	return version, nil
+}

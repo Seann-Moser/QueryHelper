@@ -10,6 +10,10 @@ type FirebaseDB struct {
 	//client *firebase.Client
 }
 
+func (f FirebaseDB) Version() string {
+	return "fb"
+}
+
 func (f FirebaseDB) GetTableIndexes(database, tableName string) ([]IndexInfo, error) {
 	//TODO implement me
 	panic("implement me")

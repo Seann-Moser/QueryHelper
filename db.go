@@ -56,6 +56,7 @@ type DB interface {
 	GetTableDefinition(database string, tableName string) ([]ColumnInfo, error)
 	Close()
 	GetDataset(ds string) string
+	Version() string
 }
 
 type DBRow interface {
@@ -71,6 +72,10 @@ type MockDB struct {
 	tables   map[string]*mockTable
 	mockData map[string]map[string]*mockData
 	prefix   string
+}
+
+func (m MockDB) Version() string {
+	return "debug"
 }
 
 func (m MockDB) GetTableIndexes(database, tableName string) ([]IndexInfo, error) {
