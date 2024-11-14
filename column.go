@@ -102,8 +102,9 @@ func (col *Column) GetDefinition() string {
 	// Properly quote the column name
 	name := fmt.Sprintf("`%s`", col.Name)
 	// Build the type with charset if applicable
+	t := strings.ToUpper(col.Type)
 	definition := fmt.Sprintf("%s %s", name, col.Type)
-	if col.Charset != "" && (strings.HasPrefix(col.Type, "CHAR") || strings.HasPrefix(col.Type, "VARCHAR") || col.Type == "TEXT" || col.Type == "JSON") {
+	if col.Charset != "" && (strings.HasPrefix(t, "CHAR") || strings.HasPrefix(t, "VARCHAR") || t == "TEXT" || t == "JSON") {
 		definition += fmt.Sprintf(" CHARACTER SET %s", col.Charset)
 	}
 
