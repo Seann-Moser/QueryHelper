@@ -2,6 +2,8 @@ package QueryHelper
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -11,6 +13,7 @@ type Column struct {
 	Dataset     string `json:"-"`
 	ColumnOrder int    `json:"-"`
 	Prefix      string `json:"-"`
+	Charset     string `json:"charset"`
 
 	Primary           bool   `json:"primary"`
 	Skip              bool   `json:"skip"`
@@ -48,6 +51,51 @@ type Column struct {
 	Decrypt bool `json:"decrypt"`
 }
 
+func GetAllNumbersAsInt(input string) ([]int, error) {
+	// Compile the regular expression to match sequences of digits
+	re := regexp.MustCompile(`\d+`)
+	matches := re.FindAllString(input, -1)
+
+	// Convert each matched string to an integer
+	var numbers []int
+	for _, match := range matches {
+		num, err := strconv.Atoi(match)
+		if err != nil {
+			return nil, fmt.Errorf("error converting %s to integer: %w", match, err)
+		}
+		numbers = append(numbers, num)
+	}
+	return numbers, nil
+}
+
+// Calculates the byte length of the column based on charset and type
+func (c *Column) GetByteLength() int {
+	// Handle variable-length types like CHAR and VARCHAR with overrides
+	if strings.HasPrefix(c.Type, "CHAR") || strings.HasPrefix(c.Type, "VARCHAR") {
+		// Multiply length by charset bytes for CHAR and VARCHAR
+		l, _ := GetAllNumbersAsInt(c.Type)
+		baseLength := 256
+		if len(l) > 0 {
+			baseLength = l[0]
+		}
+		if c.Charset == "utf8mb4" {
+			baseLength *= 4
+		}
+		return baseLength
+	}
+
+	// Look up byte size in map for fixed-size types
+	if length, exists := typeByteLength[c.Type]; exists {
+		if c.Charset == "utf8mb4" {
+			return length * 4 // Multiply by 4 for utf8mb4 character set
+		}
+		return length
+	}
+
+	// Default to 0 if type is not recognized
+	return 0
+}
+
 // GetDefinition Adjust the Column methods accordingly
 func (col *Column) GetDefinition() string {
 	// Properly quote the column name
@@ -71,6 +119,10 @@ func (col *Column) GetDefinition() string {
 
 	if col.AutoGenerateID && strings.Contains(strings.ToLower(col.Type), "int") {
 		definition += " AUTO_INCREMENT"
+	}
+	// Add charset if specified and relevant to the type (e.g., CHAR, VARCHAR, TEXT)
+	if col.Charset != "" && (strings.HasPrefix(col.Type, "CHAR") || strings.HasPrefix(col.Type, "VARCHAR") || col.Type == "TEXT" || col.Type == "JSON") {
+		definition += fmt.Sprintf(" CHARACTER SET %s", col.Charset)
 	}
 	return definition
 }

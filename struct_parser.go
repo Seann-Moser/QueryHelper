@@ -34,6 +34,29 @@ const (
 	EqualSplit  = "::"
 )
 
+// Define default byte sizes for types
+var typeByteLength = map[string]int{
+	"TINYINT":   1,
+	"SMALLINT":  2,
+	"MEDIUMINT": 3,
+	"INT":       4,
+	"BIGINT":    8,
+	"FLOAT":     4,
+	"DOUBLE":    8,
+	"DECIMAL":   5,     // Approximate storage for DECIMAL(10,2); adjust as needed
+	"CHAR":      1,     // CHAR(1) uses 1 byte per character
+	"VARCHAR":   256,   // Default 256 bytes for VARCHAR(256)
+	"TEXT":      65535, // Maximum size of TEXT in bytes
+	"BLOB":      65535, // Maximum size of BLOB in bytes
+	"JSON":      65535, // Approximate storage size for JSON
+	"DATE":      3,
+	"TIME":      3,
+	"DATETIME":  8,
+	"TIMESTAMP": 4,
+	"YEAR":      1,
+	"BOOLEAN":   1,
+}
+
 func GetColumnFromTag(name, data string, p reflect.Type) (*Column, error) {
 	dataPoints := strings.Split(data, SplitString)
 	con := map[string]interface{}{}
@@ -52,7 +75,7 @@ func GetColumnFromTag(name, data string, p reflect.Type) (*Column, error) {
 			value = strings.TrimSpace(v[1])
 		}
 		switch strings.ToLower(key) {
-		case "where", "join_name", "data_type", "default", "where_join", "foreign_key", "foreign_table", "foreign_schema", "auto_generate_id_type", "group_by_modifier", "group_by_name":
+		case "where", "join_name", "data_type", "default", "where_join", "foreign_key", "foreign_table", "foreign_schema", "auto_generate_id_type", "group_by_modifier", "group_by_name", "charset":
 			con[key] = value
 		case "order_priority":
 			v, err := strconv.ParseInt(value, 10, 64)
