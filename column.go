@@ -101,11 +101,18 @@ func (c *Column) GetByteLength() int {
 func (col *Column) GetDefinition() string {
 	// Properly quote the column name
 	name := fmt.Sprintf("`%s`", col.Name)
-	// Build the type and default value
+	// Build the type with charset if applicable
 	definition := fmt.Sprintf("%s %s", name, col.Type)
+	if col.Charset != "" && (strings.HasPrefix(col.Type, "CHAR") || strings.HasPrefix(col.Type, "VARCHAR") || col.Type == "TEXT" || col.Type == "JSON") {
+		definition += fmt.Sprintf(" CHARACTER SET %s", col.Charset)
+	}
+
+	// Add NOT NULL constraint if applicable
 	if !col.Null {
 		definition += " NOT NULL"
 	}
+
+	// Add default value handling
 	switch col.Default {
 	case "created_timestamp":
 		definition += " DEFAULT NOW()"
@@ -113,19 +120,15 @@ func (col *Column) GetDefinition() string {
 		definition += " DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
 	default:
 		if col.Default != "" {
-			// Ensure the default value is compatible with MySQL 8
 			definition += fmt.Sprintf(" DEFAULT %s", col.Default)
 		}
 	}
 
+	// Add AUTO_INCREMENT if applicable
 	if col.AutoGenerateID && strings.Contains(strings.ToLower(col.Type), "int") {
 		definition += " AUTO_INCREMENT"
 	}
-	// Add charset if specified and relevant to the type (e.g., CHAR, VARCHAR, TEXT)
-	t := strings.ToLower(col.Type)
-	if col.Charset != "" && (strings.HasPrefix(t, "char") || strings.HasPrefix(t, "varchar") || t == "text" || t == "json") {
-		definition += fmt.Sprintf(" CHARACTER SET %s", col.Charset)
-	}
+
 	return definition
 }
 
